@@ -1,0 +1,6 @@
+{
+  "name": "Zero-Adrenaline Work Engine",
+  "description": "Somatic low-arousal task activation, micro-sprint timer, ambient noise synth, and burnout protection engine for high-dread tasks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

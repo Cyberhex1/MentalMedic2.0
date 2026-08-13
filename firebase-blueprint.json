@@ -1,0 +1,133 @@
+{
+  "entities": {
+    "userProfile": {
+      "title": "UserProfile",
+      "description": "User preferences and summary metrics",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "roleTitle": { "type": "string", "maxLength": 100 },
+        "dailyGoalBits": { "type": "number" },
+        "preferredNoise": { "type": "string", "maxLength": 20 },
+        "avatarEmoji": { "type": "string", "maxLength": 10 },
+        "totalBitsLogged": { "type": "number" },
+        "streakDays": { "type": "number" },
+        "panicGroundingPhrase": { "type": "string", "maxLength": 300 },
+        "medicalEmergencyNote": { "type": "string", "maxLength": 1000 },
+        "theme": { "type": "string", "maxLength": 10 },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["name", "dailyGoalBits", "preferredNoise", "panicGroundingPhrase"]
+    },
+    "todoItem": {
+      "title": "TodoItem",
+      "description": "Task items with focus bits and priorities",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "completed": { "type": "boolean" },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "eisenhower": { "type": "string", "enum": ["urgent_important", "not_urgent_important", "urgent_not_important", "not_urgent_not_important"] },
+        "rule135": { "type": "string", "enum": ["big", "medium", "small"] },
+        "isFrog": { "type": "boolean" },
+        "focusBits": { "type": "array" },
+        "dueDate": { "type": "string", "maxLength": 50 },
+        "category": { "type": "string", "maxLength": 50 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "userId", "title", "completed", "priority", "eisenhower", "createdAt"]
+    },
+    "symptomLog": {
+      "title": "SymptomLog",
+      "description": "Medical and somatic symptom log entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "maxLength": 50 },
+        "timestamp": { "type": "number" },
+        "symptomName": { "type": "string", "maxLength": 100 },
+        "severity": { "type": "number" },
+        "triggers": { "type": "string", "maxLength": 500 },
+        "copingMethod": { "type": "string", "maxLength": 500 },
+        "bodyArea": { "type": "string", "maxLength": 100 },
+        "notes": { "type": "string", "maxLength": 1000 }
+      },
+      "required": ["id", "userId", "timestamp", "symptomName", "severity"]
+    },
+    "noteItem": {
+      "title": "NoteItem",
+      "description": "User notes and somatic scratchpad items",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 200 },
+        "content": { "type": "string", "maxLength": 5000 },
+        "category": { "type": "string", "enum": ["general", "somatic", "office", "task"] },
+        "pinned": { "type": "boolean" },
+        "date": { "type": "string", "maxLength": 50 },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["id", "userId", "title", "content", "category", "pinned", "timestamp"]
+    },
+    "sessionLog": {
+      "title": "SessionLog",
+      "description": "Sprint session logs and energy end rating",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "date": { "type": "string", "maxLength": 50 },
+        "timestamp": { "type": "number" },
+        "tasksCompleted": { "type": "number" },
+        "sprintsCount": { "type": "number" },
+        "energyEnd": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "effortRating": { "type": "string", "enum": ["low", "standard", "high"] }
+      },
+      "required": ["id", "userId", "timestamp", "tasksCompleted", "sprintsCount", "energyEnd", "effortRating"]
+    },
+    "userState": {
+      "title": "UserState",
+      "description": "App state such as battery level",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128 },
+        "battery": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["userId", "battery"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/profile/main": {
+      "schema": { "$ref": "userProfile" },
+      "description": "Main profile record for the authenticated user"
+    },
+    "/users/{userId}/todos/{todoId}": {
+      "schema": { "$ref": "todoItem" },
+      "description": "Todo tasks for the authenticated user"
+    },
+    "/users/{userId}/symptoms/{symptomId}": {
+      "schema": { "$ref": "symptomLog" },
+      "description": "Symptom logs for the authenticated user"
+    },
+    "/users/{userId}/notes/{noteId}": {
+      "schema": { "$ref": "noteItem" },
+      "description": "Notes for the authenticated user"
+    },
+    "/users/{userId}/sessionLogs/{logId}": {
+      "schema": { "$ref": "sessionLog" },
+      "description": "Session logs for the authenticated user"
+    },
+    "/users/{userId}/state/main": {
+      "schema": { "$ref": "userState" },
+      "description": "System state (battery level) for the authenticated user"
+    }
+  }
+}

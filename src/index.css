@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Explicit Base Canvas Backgrounds for Light & Dark Mode */
+html, body, #root {
+  background-color: #fdf2f8; /* Tailwind pink-50 */
+  color: #1e293b;
+  min-height: 100vh;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+html.dark, body.dark, html.dark #root {
+  background-color: #0b0f19;
+  color: #f1f5f9;
+}
+
+/* Dedicated Dark Mode Styles */
+html.dark,
+body.dark,
+.dark {
+  color-scheme: dark;
+}
+
+/* Card & Container Backgrounds in Dark Mode - Soft, Smooth Translucency */
+.dark header,
+.dark main {
+  background-color: #121826 !important;
+  border-color: #242d40 !important;
+  color: #f1f5f9 !important;
+}
+
+.dark .bg-white {
+  background-color: #151d2d !important;
+  border-color: #242f45 !important;
+}
+
+.dark .bg-slate-50 {
+  background-color: #111726 !important;
+  border-color: #1e2738 !important;
+}
+
+/* Text Colors - High Contrast Visibility in Dark Mode */
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-slate-600 {
+  color: #f8fafc !important;
+}
+
+.dark .text-slate-500,
+.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* Form Controls & Inputs */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0b0f19 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+.dark ::placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
+}
+
+/* Modal overlays */
+.dark .fixed.inset-0.bg-slate-900\/60 {
+  background-color: rgba(0, 0, 0, 0.75) !important;
+}
+
+/* Thin custom scrollbar for primary tab navigation */
+.tab-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(236, 72, 153, 0.4) rgba(241, 245, 249, 0.8);
+}
+
+.tab-scrollbar::-webkit-scrollbar {
+  height: 3px;
+}
+
+.tab-scrollbar::-webkit-scrollbar-track {
+  background: rgba(226, 232, 240, 0.6);
+  border-radius: 9999px;
+}
+
+.tab-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(236, 72, 153, 0.4);
+  border-radius: 9999px;
+}
+
+.tab-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(236, 72, 153, 0.8);
+}
+
+.dark .tab-scrollbar {
+  scrollbar-color: rgba(244, 114, 182, 0.5) rgba(30, 41, 59, 0.8);
+}
+
+.dark .tab-scrollbar::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.8);
+}
+
+.dark .tab-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(244, 114, 182, 0.5);
+}
+
+
+
+
