@@ -91,6 +91,16 @@ testConnection();
 
 // --- FIRESTORE DATA SYNC HELPERS ---
 
+export async function checkHasCloudProfile(userId: string): Promise<boolean | null> {
+  try {
+    const docSnap = await getDocFromServer(doc(db, 'users', userId, 'profile', 'main'));
+    return docSnap.exists();
+  } catch (e) {
+    console.warn('Failed to check cloud profile:', e);
+    return null;
+  }
+}
+
 // User Profile
 export async function saveUserProfileToFirestore(userId: string, profile: UserProfile) {
   const path = `users/${userId}/profile/main`;
@@ -104,13 +114,15 @@ export async function saveUserProfileToFirestore(userId: string, profile: UserPr
   }
 }
 
-export function subscribeUserProfileFromFirestore(userId: string, onUpdate: (profile: UserProfile) => void): Unsubscribe {
+export function subscribeUserProfileFromFirestore(userId: string, onUpdate: (profile: UserProfile | null) => void): Unsubscribe {
   const path = `users/${userId}/profile/main`;
   return onSnapshot(
     doc(db, 'users', userId, 'profile', 'main'),
     (docSnap) => {
       if (docSnap.exists()) {
         onUpdate(docSnap.data() as UserProfile);
+      } else {
+        onUpdate(null);
       }
     },
     (err) => {
@@ -285,13 +297,15 @@ export async function saveUserStateToFirestore(userId: string, battery: number) 
   }
 }
 
-export function subscribeUserStateFromFirestore(userId: string, onUpdate: (battery: number) => void): Unsubscribe {
+export function subscribeUserStateFromFirestore(userId: string, onUpdate: (battery: number | null) => void): Unsubscribe {
   const path = `users/${userId}/state/main`;
   return onSnapshot(
     doc(db, 'users', userId, 'state', 'main'),
     (docSnap) => {
       if (docSnap.exists() && typeof docSnap.data().battery === 'number') {
         onUpdate(docSnap.data().battery);
+      } else {
+        onUpdate(null);
       }
     },
     (err) => {

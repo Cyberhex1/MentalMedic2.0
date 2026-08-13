@@ -60,6 +60,7 @@ export const MicroSprintTimer: React.FC<MicroSprintTimerProps> = ({ onLogTask, o
     minutesSpent: 10,
   });
 
+  const lastTickRef = useRef<number>(Date.now());
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleSelectPreset = (preset: SprintConfig) => {
@@ -75,34 +76,46 @@ export const MicroSprintTimer: React.FC<MicroSprintTimerProps> = ({ onLogTask, o
       return;
     }
 
+    lastTickRef.current = Date.now();
+
     timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev > 1) return prev - 1;
+      const now = Date.now();
+      const deltaMs = now - lastTickRef.current;
+      const deltaSecs = Math.floor(deltaMs / 1000);
 
-        audioSynth.playChime();
+      if (deltaSecs >= 1) {
+        lastTickRef.current += deltaSecs * 1000;
 
-        if (phase === 'work') {
-          setPhase('rest');
-          setSprintTotalCompleted((c) => c + 1);
+        setTimeLeft((prev) => {
+          const newTime = prev - deltaSecs;
+          
+          if (newTime > 0) return newTime;
 
-          // Show encouragement modal
-          const messages = ENCOURAGEMENTS[selectedPreset.name] || ENCOURAGEMENTS['10 Mins Sprint'];
-          const randomMsg = messages[Math.floor(Math.random() * messages.length)];
-          const minutesSpent = Math.round(selectedPreset.workDuration / 60);
+          audioSynth.playChime();
 
-          setEncouragementModal({
-            isOpen: true,
-            title: `✨ ${minutesSpent}-Minute Sprint Completed!`,
-            message: randomMsg,
-            minutesSpent,
-          });
+          if (phase === 'work') {
+            setPhase('rest');
+            setSprintTotalCompleted((c) => c + 1);
 
-          return selectedPreset.restDuration;
-        } else {
-          setPhase('work');
-          return selectedPreset.workDuration;
-        }
-      });
+            // Show encouragement modal
+            const messages = ENCOURAGEMENTS[selectedPreset.name] || ENCOURAGEMENTS['10 Mins Sprint'];
+            const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+            const minutesSpent = Math.round(selectedPreset.workDuration / 60);
+
+            setEncouragementModal({
+              isOpen: true,
+              title: `✨ ${minutesSpent}-Minute Sprint Completed!`,
+              message: randomMsg,
+              minutesSpent,
+            });
+
+            return Math.max(0, selectedPreset.restDuration + newTime);
+          } else {
+            setPhase('work');
+            return Math.max(0, selectedPreset.workDuration + newTime);
+          }
+        });
+      }
     }, 1000);
 
     return () => {

@@ -20,6 +20,7 @@ import { SessionLog, TodoItem, SymptomLog, UserProfile, NoteItem, ActiveTab } fr
 import { initWorkspaceAuth, logoutGoogleWorkspace } from './lib/googleWorkspace';
 import { audioSynth } from './lib/audioSynth';
 import { User } from 'firebase/auth';
+import { Unsubscribe } from 'firebase/firestore';
 import {
   saveUserProfileToFirestore,
   subscribeUserProfileFromFirestore,
@@ -37,6 +38,7 @@ import {
   saveUserStateToFirestore,
   subscribeUserStateFromFirestore,
   syncAllWithFirestore,
+  checkHasCloudProfile,
 } from './lib/firebase';
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -222,82 +224,52 @@ export default function App() {
   useEffect(() => {
     if (!googleUser) return;
     const uid = googleUser.uid;
+    let isActive = true;
+    let unsubs: Unsubscribe[] = [];
 
-    let isProfileInitial = true;
-    const unsubProfile = subscribeUserProfileFromFirestore(uid, (profile) => {
-      if (profile) {
-        setUserProfile((prev) => ({ ...prev, ...profile }));
-      } else if (isProfileInitial) {
-        saveUserProfileToFirestore(uid, userProfile);
-      }
-      isProfileInitial = false;
-    });
+    const initSync = async () => {
+      const hasCloudProfile = await checkHasCloudProfile(uid);
+      if (!isActive) return;
 
-    let isTodosInitial = true;
-    const unsubTodos = subscribeTodosFromFirestore(uid, (remoteTodos) => {
-      if (remoteTodos) {
-        if (remoteTodos.length > 0) {
-          setTodos(remoteTodos);
-        } else if (isTodosInitial) {
-          todos.forEach((t) => saveTodoToFirestore(uid, t));
-        } else {
-          setTodos([]);
-        }
+      if (hasCloudProfile === false) {
+        // Brand new account (or no profile) - push local state up to seed the cloud
+        await syncAllWithFirestore(uid, userProfile, todos, symptomLogs, notes, sessionLogs, battery);
       }
-      isTodosInitial = false;
-    });
 
-    let isSymptomsInitial = true;
-    const unsubSymptoms = subscribeSymptomsFromFirestore(uid, (remoteSymptoms) => {
-      if (remoteSymptoms) {
-        if (remoteSymptoms.length > 0) {
-          setSymptomLogs(remoteSymptoms);
-        } else if (isSymptomsInitial) {
-          symptomLogs.forEach((s) => saveSymptomToFirestore(uid, s));
-        } else {
-          setSymptomLogs([]);
-        }
-      }
-      isSymptomsInitial = false;
-    });
+      // Attach realtime listeners that explicitly OVERWRITE local state
+      // ensuring that logging in or switching devices creates an identical replica.
+      if (!isActive) return;
 
-    let isNotesInitial = true;
-    const unsubNotes = subscribeNotesFromFirestore(uid, (remoteNotes) => {
-      if (remoteNotes) {
-        if (remoteNotes.length > 0) {
-          setNotes(remoteNotes);
-        } else if (isNotesInitial) {
-          notes.forEach((n) => saveNoteToFirestore(uid, n));
-        } else {
-          setNotes([]);
-        }
-      }
-      isNotesInitial = false;
-    });
+      unsubs.push(subscribeUserProfileFromFirestore(uid, (profile) => {
+        if (profile) setUserProfile({ ...DEFAULT_PROFILE, ...profile });
+      }));
 
-    const unsubLogs = subscribeSessionLogsFromFirestore(uid, (remoteLogs) => {
-      if (remoteLogs) {
-        setSessionLogs(remoteLogs);
-      }
-    });
+      unsubs.push(subscribeTodosFromFirestore(uid, (remoteTodos) => {
+        if (remoteTodos) setTodos(remoteTodos);
+      }));
 
-    let isStateInitial = true;
-    const unsubState = subscribeUserStateFromFirestore(uid, (remoteBattery) => {
-      if (typeof remoteBattery === 'number') {
-        setBattery(remoteBattery);
-      } else if (isStateInitial) {
-        saveUserStateToFirestore(uid, battery);
-      }
-      isStateInitial = false;
-    });
+      unsubs.push(subscribeSymptomsFromFirestore(uid, (remoteSymptoms) => {
+        if (remoteSymptoms) setSymptomLogs(remoteSymptoms);
+      }));
+
+      unsubs.push(subscribeNotesFromFirestore(uid, (remoteNotes) => {
+        if (remoteNotes) setNotes(remoteNotes);
+      }));
+
+      unsubs.push(subscribeSessionLogsFromFirestore(uid, (remoteLogs) => {
+        if (remoteLogs) setSessionLogs(remoteLogs);
+      }));
+
+      unsubs.push(subscribeUserStateFromFirestore(uid, (remoteBattery) => {
+        if (typeof remoteBattery === 'number') setBattery(remoteBattery);
+      }));
+    };
+
+    initSync();
 
     return () => {
-      unsubProfile();
-      unsubTodos();
-      unsubSymptoms();
-      unsubNotes();
-      unsubLogs();
-      unsubState();
+      isActive = false;
+      unsubs.forEach((unsub) => unsub());
     };
   }, [googleUser?.uid]);
 
@@ -844,6 +816,7 @@ export default function App() {
           onGoogleLogout={async () => {
             await logoutGoogleWorkspace();
             setGoogleUser(null);
+            handleClearAllData();
             triggerToast('Signed out of Google Account');
           }}
         />
