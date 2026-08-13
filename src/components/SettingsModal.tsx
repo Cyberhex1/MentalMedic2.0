@@ -9,7 +9,6 @@ const TAB_LABELS: Record<string, string> = {
   meditation: '🧘 Guided Meditation & Pacer',
   yoga: '🌸 Somatic Adaptive Yoga',
   medical: '🩺 Medical & Symptom Health Log',
-  office: '🏢 Low-Overhead Virtual Office',
   shiftLogs: '📜 Historical Shift Logs Archive',
   workspace: '☁️ Workspace Sync',
 };

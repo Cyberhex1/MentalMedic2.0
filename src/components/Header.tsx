@@ -42,15 +42,14 @@ export const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     const checkTracks = () => {
       // count active soundscape tracks
-      const activeList = ['brown', 'pink', 'white', 'rain', 'binaural', 'drone', 'office', 'cafe', 'keyboard', 'coffee', 'medieval', 'lofi', 'cute_hyper', 'cute_chill', 'asmr_tapping', 'asmr_rustle', 'asmr_scratch', 'park', 'island_breeze'];
-      const count = activeList.filter((t) => audioSynth.isSoundscapeActive(t as any)).length;
+      const count = (userProfile.activeSoundscapes?.length || 0) + (userProfile.currentYoutubeUrl ? 1 : 0);
       setActiveTracksCount(count);
     };
 
     checkTracks();
     const interval = setInterval(checkTracks, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [userProfile.activeSoundscapes, userProfile.currentYoutubeUrl]);
 
   const handleToggleDefaultSound = () => {
     if (activeTracksCount > 0) {

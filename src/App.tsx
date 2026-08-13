@@ -5,7 +5,6 @@ import { SomaticMindsetTab } from './components/SomaticMindsetTab';
 import { TodoFocusBitsTab } from './components/TodoFocusBitsTab';
 import { MicroSprintTimer } from './components/MicroSprintTimer';
 import { MedicalSymptomsTab } from './components/MedicalSymptomsTab';
-import { VirtualOfficeTab } from './components/VirtualOfficeTab';
 import { MeditationTab } from './components/MeditationTab';
 import { YogaTab } from './components/YogaTab';
 import { PanicOverlay } from './components/PanicOverlay';
@@ -659,7 +658,7 @@ export default function App() {
   };
 
   // Tab Order definitions - Merge saved order with default list to ensure no newly added tabs are omitted
-  const defaultTabList: ActiveTab[] = ['somatic', 'todo', 'sprint', 'meditation', 'yoga', 'medical', 'office'];
+  const defaultTabList: ActiveTab[] = ['somatic', 'todo', 'sprint', 'meditation', 'yoga', 'medical'];
   const userSavedOrder = userProfile.tabOrder || defaultTabList;
   const missingTabs = defaultTabList.filter((tab) => !userSavedOrder.includes(tab));
   const customTabOrder = [...userSavedOrder, ...missingTabs];
@@ -676,7 +675,6 @@ export default function App() {
     meditation: { label: 'Meditation & Pacer', icon: <Wind className="w-4 h-4" /> },
     yoga: { label: 'Adaptive Yoga', icon: <Sparkles className="w-4 h-4" /> },
     medical: { label: 'Medical Symptoms', icon: <Activity className="w-4 h-4" /> },
-    office: { label: 'Pretend Office', icon: <Building2 className="w-4 h-4" /> },
   };
 
   return (
@@ -766,8 +764,6 @@ export default function App() {
               onDeleteLog={handleDeleteSymptomLog}
             />
           )}
-
-          {activeTab === 'office' && <VirtualOfficeTab />}
         </main>
 
         {/* Toast Alert */}

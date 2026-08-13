@@ -2,22 +2,14 @@ import React, { useState } from 'react';
 import {
   X,
   Volume2,
-  VolumeX,
-  Music,
   Sliders,
   Sparkles,
-  Coffee,
-  Keyboard,
-  Wind,
-  CloudRain,
-  Feather,
-  Sun,
-  Trees,
-  Radio,
-  Headphones,
-  Maximize2,
   Play,
   Square,
+  Youtube,
+  Plus,
+  Trash2,
+  Disc,
 } from 'lucide-react';
 import { AudioType, UserProfile } from '../types';
 import { audioSynth } from '../lib/audioSynth';
@@ -32,36 +24,14 @@ interface SoundscapeMixerModalProps {
 interface SoundItem {
   id: AudioType;
   name: string;
-  category: 'Focus & Noise' | 'Music & Vibe' | 'Cute & ASMR' | 'Nature & World';
+  category: 'Focus & Noise' | 'Music & Vibe';
   icon: React.ReactNode;
   description: string;
 }
 
 const SOUNDSCAPES: SoundItem[] = [
-  // Focus & Noise
   { id: 'brown', name: 'Brown Noise', category: 'Focus & Noise', icon: <Volume2 className="w-4 h-4 text-amber-500" />, description: 'Deep, warm rumble for executive dysfunction relief' },
-  { id: 'pink', name: 'Pink Noise', category: 'Focus & Noise', icon: <Volume2 className="w-4 h-4 text-pink-500" />, description: 'Balanced soft noise for steady sensory flow' },
-  { id: 'white', name: 'White Noise', category: 'Focus & Noise', icon: <Volume2 className="w-4 h-4 text-slate-400" />, description: 'Crisp, masking noise for noisy environments' },
-  { id: 'binaural', name: 'Binaural Focus', category: 'Focus & Noise', icon: <Headphones className="w-4 h-4 text-indigo-500" />, description: '40Hz Gamma wave entrainment for deep concentration' },
-  { id: 'drone', name: '432Hz Zen Drone', category: 'Focus & Noise', icon: <Radio className="w-4 h-4 text-emerald-500" />, description: 'Harmonic 432Hz breathing frequencies' },
-
-  // Music & Vibe
-  { id: 'lofi', name: 'Lofi Chill Beats', category: 'Music & Vibe', icon: <Music className="w-4 h-4 text-purple-500" />, description: 'Warm vinyl crackle & mellow chord progression' },
-  { id: 'medieval', name: 'Medieval Study', category: 'Music & Vibe', icon: <Feather className="w-4 h-4 text-amber-700" />, description: 'Lute & harp ambient acoustic chords' },
-  { id: 'cute_hyper', name: 'Cute Hyper Chiptune', category: 'Music & Vibe', icon: <Sparkles className="w-4 h-4 text-fuchsia-500" />, description: 'Upbeat 8-bit playful synth rhythm' },
-  { id: 'cute_chill', name: 'Cute Chill Dreams', category: 'Music & Vibe', icon: <Sparkles className="w-4 h-4 text-pink-400" />, description: 'Dreamy soft pastel pad synth' },
-
-  // Cute & ASMR
-  { id: 'asmr_tapping', name: 'ASMR Soft Tapping', category: 'Cute & ASMR', icon: <Sparkles className="w-4 h-4 text-teal-500" />, description: 'Gentle wood & glass fingernail tapping' },
-  { id: 'asmr_rustle', name: 'ASMR Page Rustle', category: 'Cute & ASMR', icon: <Feather className="w-4 h-4 text-amber-500" />, description: 'Book page turns & soft whispered murmurs' },
-  { id: 'asmr_scratch', name: 'ASMR Soft Brush', category: 'Cute & ASMR', icon: <Sparkles className="w-4 h-4 text-rose-400" />, description: 'Fabric brushing & mic scratch textures' },
-  { id: 'keyboard', name: 'Mechanical Keyboard', category: 'Cute & ASMR', icon: <Keyboard className="w-4 h-4 text-indigo-400" />, description: 'Rhythmic mechanical switch clicks' },
-  { id: 'coffee', name: 'Coffee Percolator', category: 'Cute & ASMR', icon: <Coffee className="w-4 h-4 text-amber-600" />, description: 'Steaming espresso & bubbling coffee brew' },
-
-  // Nature & World
-  { id: 'rain', name: 'Gentle Rain Patter', category: 'Nature & World', icon: <CloudRain className="w-4 h-4 text-blue-500" />, description: 'Soft raindrops on windowpane' },
-  { id: 'park', name: 'Sunny Park & Birds', category: 'Nature & World', icon: <Trees className="w-4 h-4 text-emerald-600" />, description: 'Distantly singing birds & gentle breeze' },
-  { id: 'island_breeze', name: 'Island Palms & Wind', category: 'Nature & World', icon: <Sun className="w-4 h-4 text-yellow-500" />, description: 'Warm ocean breeze & rustling palm fronds' },
+  { id: 'cute_hyper', name: 'Hi Popping Sound', category: 'Music & Vibe', icon: <Sparkles className="w-4 h-4 text-fuchsia-500" />, description: 'Upbeat 8-bit playful synth rhythm' },
 ];
 
 export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
@@ -70,10 +40,16 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
   userProfile,
   onUpdateProfile,
 }) => {
+  const [ytUrlInput, setYtUrlInput] = useState('');
+  const [ytNameInput, setYtNameInput] = useState('');
+  const [isAddingPlaylist, setIsAddingPlaylist] = useState(false);
+
   if (!isOpen) return null;
 
   const activeSoundscapes = userProfile.activeSoundscapes || ['brown'];
   const mixerVolumes = userProfile.mixerVolumes || { brown: 0.5 };
+  const savedYoutubePlaylists = userProfile.youtubePlaylists || [];
+  const currentYoutubeUrl = userProfile.currentYoutubeUrl || '';
 
   const handleToggle = (id: AudioType) => {
     const isActive = activeSoundscapes.includes(id);
@@ -112,10 +88,55 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
     onUpdateProfile({
       ...userProfile,
       activeSoundscapes: [],
+      currentYoutubeUrl: '',
     });
   };
 
-  const categories = ['Focus & Noise', 'Music & Vibe', 'Cute & ASMR', 'Nature & World'] as const;
+  const parseYoutubeEmbed = (url: string) => {
+    try {
+      const listMatch = url.match(/[?&]list=([^&]+)/);
+      if (listMatch) return `https://www.youtube.com/embed/videoseries?list=${listMatch[1]}&autoplay=1`;
+      
+      const videoMatch = url.match(/(?:youtu\.be\/|v=|\/v\/|\/embed\/)([^?&\n]+)/);
+      if (videoMatch) return `https://www.youtube.com/embed/${videoMatch[1]}?autoplay=1`;
+      
+      return url;
+    } catch {
+      return url;
+    }
+  };
+
+  const handleSavePlaylist = () => {
+    if (!ytUrlInput || !ytNameInput) return;
+    const newPlaylist = {
+      id: Date.now().toString(),
+      name: ytNameInput,
+      url: ytUrlInput,
+    };
+    onUpdateProfile({
+      ...userProfile,
+      youtubePlaylists: [...savedYoutubePlaylists, newPlaylist]
+    });
+    setYtUrlInput('');
+    setYtNameInput('');
+    setIsAddingPlaylist(false);
+  };
+
+  const handleDeletePlaylist = (id: string) => {
+    onUpdateProfile({
+      ...userProfile,
+      youtubePlaylists: savedYoutubePlaylists.filter(p => p.id !== id)
+    });
+  };
+
+  const handlePlayYoutube = (url: string) => {
+    onUpdateProfile({
+      ...userProfile,
+      currentYoutubeUrl: url === currentYoutubeUrl ? '' : url
+    });
+  };
+
+  const categories = ['Focus & Noise', 'Music & Vibe'] as const;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
@@ -130,17 +151,17 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <span>Multi-Track Soundscape Studio</span>
                 <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300">
-                  {activeSoundscapes.length} Active
+                  {activeSoundscapes.length + (currentYoutubeUrl ? 1 : 0)} Active
                 </span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Layer multiple soundscapes simultaneously and adjust independent volume controls!
+                Mix your favorite noise with saved YouTube playlists.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {activeSoundscapes.length > 0 && (
+            {(activeSoundscapes.length > 0 || currentYoutubeUrl) && (
               <button
                 onClick={handleStopAll}
                 className="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-xl font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
@@ -158,10 +179,12 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
           </div>
         </div>
 
-        {/* Scrollable Tracks List */}
+        {/* Scrollable Tracks & YouTube List */}
         <div className="p-5 overflow-y-auto space-y-6 flex-1">
+          {/* Native Soundscapes */}
           {categories.map((cat) => {
             const catSounds = SOUNDSCAPES.filter((s) => s.category === cat);
+            if (catSounds.length === 0) return null;
             return (
               <div key={cat} className="space-y-3">
                 <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800 pb-1">
@@ -191,33 +214,16 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                             </div>
                           </div>
 
-                          {s.id === 'lofi' || s.id === 'medieval' ? (
-                            <a
-                              href={s.id === 'lofi' ? 'https://www.youtube.com/watch?v=jfKfPfyJRdk' : 'https://www.youtube.com/watch?v=yvGCOZlshF4'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() => handleToggle(s.id)}
-                              className={`p-2 rounded-xl font-bold text-xs flex items-center justify-center transition-all cursor-pointer ${
-                                isActive
-                                  ? 'bg-pink-500 text-white shadow-sm shadow-pink-500/30'
-                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                              }`}
-                              title={s.id === 'lofi' ? 'Open live Lofi Girl stream on YouTube' : 'Open cozy Medieval Tavern ambient lute music on YouTube'}
-                            >
-                              {isActive ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                            </a>
-                          ) : (
-                            <button
-                              onClick={() => handleToggle(s.id)}
-                              className={`p-2 rounded-xl font-bold text-xs flex items-center justify-center transition-all cursor-pointer ${
-                                isActive
-                                  ? 'bg-pink-500 text-white shadow-sm shadow-pink-500/30'
-                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-                              }`}
-                            >
-                              {isActive ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                            </button>
-                          )}
+                          <button
+                            onClick={() => handleToggle(s.id)}
+                            className={`p-2 rounded-xl font-bold text-xs flex items-center justify-center transition-all cursor-pointer ${
+                              isActive
+                                ? 'bg-pink-500 text-white shadow-sm shadow-pink-500/30'
+                                : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                            }`}
+                          >
+                            {isActive ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                          </button>
                         </div>
 
                         {/* Volume Slider if Active */}
@@ -245,6 +251,119 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
               </div>
             );
           })}
+
+          {/* YouTube Playlists Section */}
+          <div className="space-y-3 pt-2">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-1">
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                YouTube Playlists
+              </h4>
+              <button 
+                onClick={() => setIsAddingPlaylist(!isAddingPlaylist)}
+                className="text-[10px] flex items-center gap-1 font-bold text-pink-500 hover:text-pink-600 cursor-pointer"
+              >
+                {isAddingPlaylist ? 'Cancel' : <><Plus className="w-3 h-3" /> Add New</>}
+              </button>
+            </div>
+
+            {isAddingPlaylist && (
+              <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col gap-3 animate-fadeIn">
+                <input
+                  type="text"
+                  placeholder="Playlist or Video Name (e.g. Lofi Girl)"
+                  value={ytNameInput}
+                  onChange={(e) => setYtNameInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+                />
+                <input
+                  type="text"
+                  placeholder="YouTube URL"
+                  value={ytUrlInput}
+                  onChange={(e) => setYtUrlInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500"
+                />
+                <button
+                  onClick={handleSavePlaylist}
+                  disabled={!ytUrlInput || !ytNameInput}
+                  className="w-full py-2 bg-pink-500 disabled:opacity-50 text-white rounded-xl font-bold text-xs hover:bg-pink-600 transition-colors cursor-pointer"
+                >
+                  Save to Library
+                </button>
+              </div>
+            )}
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              {savedYoutubePlaylists.map((playlist) => {
+                const isActive = currentYoutubeUrl === playlist.url;
+                return (
+                  <div
+                    key={playlist.id}
+                    className={`p-3.5 rounded-2xl border transition-all ${
+                      isActive
+                        ? 'bg-red-50/80 dark:bg-red-950/30 border-red-300 dark:border-red-800 shadow-sm'
+                        : 'bg-white dark:bg-slate-800/60 border-slate-100 dark:border-slate-800 hover:border-red-200'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-2 rounded-xl shadow-xs ${isActive ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600 dark:bg-slate-700 dark:text-red-400'}`}>
+                          <Youtube className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{playlist.name}</h5>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400">YouTube Stream</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handlePlayYoutube(playlist.url)}
+                          className={`p-2 rounded-xl font-bold text-xs flex items-center justify-center transition-all cursor-pointer ${
+                            isActive
+                              ? 'bg-red-500 text-white shadow-sm'
+                              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                          }`}
+                        >
+                          {isActive ? <Square className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                        </button>
+                        <button
+                          onClick={() => handleDeletePlaylist(playlist.id)}
+                          className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                          title="Delete Playlist"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {savedYoutubePlaylists.length === 0 && !isAddingPlaylist && (
+                <div className="col-span-full py-8 flex flex-col items-center justify-center text-center px-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700">
+                  <Disc className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
+                  <p className="text-sm font-bold text-slate-600 dark:text-slate-300">No playlists saved</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-[250px]">
+                    Add your favorite Lofi, classical, or ambient YouTube videos to play them here.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Embedded YouTube Player */}
+            {currentYoutubeUrl && (
+              <div className="mt-4 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 shadow-lg bg-black aspect-video animate-fadeIn">
+                <iframe
+                  width="100%"
+                  height="100%"
+                  src={parseYoutubeEmbed(currentYoutubeUrl)}
+                  title="YouTube video player"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                ></iframe>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}

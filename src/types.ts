@@ -1,4 +1,4 @@
-export type ActiveTab = 'somatic' | 'todo' | 'sprint' | 'meditation' | 'yoga' | 'medical' | 'office';
+export type ActiveTab = 'somatic' | 'todo' | 'sprint' | 'meditation' | 'yoga' | 'medical';
 
 export type AudioType =
   | 'brown'
@@ -124,6 +124,8 @@ export interface UserProfile {
   activeSoundscapes?: string[];
   officeVolumes?: Record<string, number>;
   activeOfficeAudio?: string[];
+  youtubePlaylists?: { id: string; name: string; url: string }[];
+  currentYoutubeUrl?: string;
 }
 
 export interface VirtualCoworker {
