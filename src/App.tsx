@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, ListTodo, Timer, Activity, Building2, Layers, Sparkles, Sliders, Wind } from 'lucide-react';
 import { Header } from './components/Header';
-import { SomaticMindsetTab } from './components/SomaticMindsetTab';
 import { TodoFocusBitsTab } from './components/TodoFocusBitsTab';
 import { MicroSprintTimer } from './components/MicroSprintTimer';
 import { MedicalSymptomsTab } from './components/MedicalSymptomsTab';
@@ -12,34 +11,22 @@ import { SessionLogsModal } from './components/SessionLogsModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { NotesDrawer } from './components/NotesDrawer';
 import { SettingsModal } from './components/SettingsModal';
+import { LoginModal } from './components/LoginModal';
 import { SoundscapeMixerModal } from './components/SoundscapeMixerModal';
 import { AnalyticsModal } from './components/AnalyticsModal';
 import { TypingSoundEngine } from './components/TypingSoundEngine';
 import { CuteUiDecorator } from './components/CuteUiDecorator';
 import { SessionLog, TodoItem, SymptomLog, UserProfile, NoteItem, ActiveTab } from './types';
-import { initWorkspaceAuth, logoutGoogleWorkspace } from './lib/googleWorkspace';
 import { audioSynth } from './lib/audioSynth';
 import { User } from 'firebase/auth';
 import { Unsubscribe } from 'firebase/firestore';
 import {
-  saveUserProfileToFirestore,
-  subscribeUserProfileFromFirestore,
-  saveTodoToFirestore,
-  deleteTodoFromFirestore,
-  subscribeTodosFromFirestore,
-  saveSymptomToFirestore,
-  deleteSymptomFromFirestore,
-  subscribeSymptomsFromFirestore,
-  saveNoteToFirestore,
-  deleteNoteFromFirestore,
-  subscribeNotesFromFirestore,
-  saveSessionLogToFirestore,
-  subscribeSessionLogsFromFirestore,
-  saveUserStateToFirestore,
-  subscribeUserStateFromFirestore,
-  syncAllWithFirestore,
-  checkHasCloudProfile,
+  auth,
+  saveAppSnapshot,
+  subscribeAppSnapshot,
+  AppSnapshot
 } from './lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 const DEFAULT_PROFILE: UserProfile = {
   name: 'Calm Focus Worker',
@@ -54,7 +41,7 @@ const DEFAULT_PROFILE: UserProfile = {
   xp: 150,
   cuteSoundEffects: true,
   cuteUiEffects: true,
-  tabOrder: ['somatic', 'todo', 'medical', 'office'],
+  tabOrder: ['todo', 'medical', 'sprint'],
   activeSoundscapes: ['brown'],
   mixerVolumes: { brown: 0.5 },
 };
@@ -184,7 +171,8 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [googleUser, setGoogleUser] = useState<User | null>(null);
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [isSnapshotLoaded, setIsSnapshotLoaded] = useState(false);
 
   const [activeSprintTaskTitle, setActiveSprintTaskTitle] = useState<string>('');
   const [isPanicOpen, setIsPanicOpen] = useState<boolean>(false);
@@ -192,16 +180,16 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
   const [isNotesOpen, setIsNotesOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
   const [isMixerOpen, setIsMixerOpen] = useState<boolean>(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Initialize Auth state listener
   useEffect(() => {
-    const unsubscribe = initWorkspaceAuth(
-      (user) => setGoogleUser(user),
-      () => setGoogleUser(null)
-    );
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+    });
     return () => unsubscribe();
   }, []);
 
@@ -220,58 +208,41 @@ export default function App() {
     };
   }, []);
 
-  // Subscribe to Firestore data when user is authenticated
+  // Load initial snapshot
   useEffect(() => {
-    if (!googleUser) return;
-    const uid = googleUser.uid;
-    let isActive = true;
-    let unsubs: Unsubscribe[] = [];
-
-    const initSync = async () => {
-      const hasCloudProfile = await checkHasCloudProfile(uid);
-      if (!isActive) return;
-
-      if (hasCloudProfile === false) {
-        // Brand new account (or no profile) - push local state up to seed the cloud
-        await syncAllWithFirestore(uid, userProfile, todos, symptomLogs, notes, sessionLogs, battery);
+    if (!authUser) {
+      setIsSnapshotLoaded(false);
+      return;
+    }
+    const unsub = subscribeAppSnapshot(authUser.uid, (snapshot) => {
+      if (snapshot) {
+        if (snapshot.userProfile) setUserProfile({ ...DEFAULT_PROFILE, ...snapshot.userProfile });
+        if (snapshot.todos) setTodos(snapshot.todos);
+        if (snapshot.symptomLogs) setSymptomLogs(snapshot.symptomLogs);
+        if (snapshot.notes) setNotes(snapshot.notes);
+        if (snapshot.sessionLogs) setSessionLogs(snapshot.sessionLogs);
+        if (typeof snapshot.battery === 'number') setBattery(snapshot.battery);
       }
+      setIsSnapshotLoaded(true);
+    });
+    return () => unsub();
+  }, [authUser]);
 
-      // Attach realtime listeners that explicitly OVERWRITE local state
-      // ensuring that logging in or switching devices creates an identical replica.
-      if (!isActive) return;
-
-      unsubs.push(subscribeUserProfileFromFirestore(uid, (profile) => {
-        if (profile) setUserProfile({ ...DEFAULT_PROFILE, ...profile });
-      }));
-
-      unsubs.push(subscribeTodosFromFirestore(uid, (remoteTodos) => {
-        if (remoteTodos) setTodos(remoteTodos);
-      }));
-
-      unsubs.push(subscribeSymptomsFromFirestore(uid, (remoteSymptoms) => {
-        if (remoteSymptoms) setSymptomLogs(remoteSymptoms);
-      }));
-
-      unsubs.push(subscribeNotesFromFirestore(uid, (remoteNotes) => {
-        if (remoteNotes) setNotes(remoteNotes);
-      }));
-
-      unsubs.push(subscribeSessionLogsFromFirestore(uid, (remoteLogs) => {
-        if (remoteLogs) setSessionLogs(remoteLogs);
-      }));
-
-      unsubs.push(subscribeUserStateFromFirestore(uid, (remoteBattery) => {
-        if (typeof remoteBattery === 'number') setBattery(remoteBattery);
-      }));
-    };
-
-    initSync();
-
-    return () => {
-      isActive = false;
-      unsubs.forEach((unsub) => unsub());
-    };
-  }, [googleUser?.uid]);
+  // Save snapshot continuously when state changes, debounced
+  useEffect(() => {
+    if (!authUser || !isSnapshotLoaded) return;
+    const timeout = setTimeout(() => {
+      saveAppSnapshot(authUser.uid, {
+        userProfile,
+        todos,
+        symptomLogs,
+        notes,
+        sessionLogs,
+        battery
+      });
+    }, 1000); // 1 second debounce
+    return () => clearTimeout(timeout);
+  }, [authUser, isSnapshotLoaded, userProfile, todos, symptomLogs, notes, sessionLogs, battery]);
 
   useEffect(() => {
     localStorage.setItem('zawe_battery', battery.toString());
@@ -311,9 +282,7 @@ export default function App() {
     setUserProfile((prev) => {
       const nextXp = (prev.xp || 0) + amount;
       const updated = { ...prev, xp: nextXp };
-      if (googleUser) {
-        saveUserProfileToFirestore(googleUser.uid, updated);
-      }
+      
       return updated;
     });
     if (userProfile.cuteSoundEffects !== false) {
@@ -323,17 +292,15 @@ export default function App() {
 
   const handleUpdateProfile = (updated: UserProfile) => {
     setUserProfile(updated);
-    if (googleUser) {
-      saveUserProfileToFirestore(googleUser.uid, updated);
-    }
+    
   };
 
   const handleManualSync = async () => {
-    if (!googleUser) {
+    if (!authUser) {
       triggerToast('Cloud sync requires logging in with an account');
       return;
     }
-    await syncAllWithFirestore(googleUser.uid, userProfile, todos, symptomLogs, notes, sessionLogs, battery);
+    await saveAppSnapshot(authUser.uid, { userProfile, todos, symptomLogs, notes, sessionLogs, battery });
     triggerToast('☁️ Manual Cloud Sync Complete!');
   };
 
@@ -343,9 +310,7 @@ export default function App() {
       if (next <= 25 && prev > 25) {
         triggerToast('⚠️ Cognitive Battery Low! Mandatory 3-minute somatic rest recommended.');
       }
-      if (googleUser) {
-        saveUserStateToFirestore(googleUser.uid, next);
-      }
+      
       return next;
     });
   };
@@ -353,9 +318,7 @@ export default function App() {
   const handleRechargeBattery = () => {
     setBattery((prev) => {
       const next = Math.min(100, prev + 25);
-      if (googleUser) {
-        saveUserStateToFirestore(googleUser.uid, next);
-      }
+      
       return next;
     });
     triggerToast('🔋 Somatic Recharge applied (+25% Energy)!');
@@ -369,9 +332,7 @@ export default function App() {
         ...prev,
         totalBitsLogged: prev.totalBitsLogged + 1,
       };
-      if (googleUser) {
-        saveUserProfileToFirestore(googleUser.uid, next);
-      }
+      
       return next;
     });
     triggerToast('✨ 1 Focus Bit Completed (+25 XP)! Cognitive battery auto-lowered.');
@@ -402,9 +363,7 @@ export default function App() {
     };
 
     setSessionLogs((prev) => [archivedLog, ...prev]);
-    if (googleUser) {
-      saveSessionLogToFirestore(googleUser.uid, archivedLog);
-    }
+    
 
     setTodos((prev) => {
       const updated = prev.map((t) => ({
@@ -412,9 +371,7 @@ export default function App() {
         completed: false,
         focusBits: t.focusBits.map((b) => ({ ...b, completed: false })),
       }));
-      if (googleUser) {
-        updated.forEach((t) => saveTodoToFirestore(googleUser.uid, t));
-      }
+      
       return updated;
     });
     setBattery(100);
@@ -462,9 +419,7 @@ export default function App() {
       createdAt: Date.now(),
     };
     setTodos((prev) => [newTodo, ...prev]);
-    if (googleUser) {
-      saveTodoToFirestore(googleUser.uid, newTodo);
-    }
+    
     triggerToast('Added new task to Matrix');
   };
 
@@ -475,9 +430,7 @@ export default function App() {
           const isCompleting = !t.completed;
           const updated = { ...t, completed: isCompleting };
           if (isCompleting) addXp(50);
-          if (googleUser) {
-            saveTodoToFirestore(googleUser.uid, updated);
-          }
+          
           return updated;
         }
         return t;
@@ -487,9 +440,7 @@ export default function App() {
 
   const handleDeleteTodo = (id: string) => {
     setTodos((prev) => prev.filter((t) => t.id !== id));
-    if (googleUser) {
-      deleteTodoFromFirestore(googleUser.uid, id);
-    }
+    
   };
 
   const handleShatterIntoFocusBits = (todoId: string, bitTitles: string[]) => {
@@ -507,9 +458,7 @@ export default function App() {
             ...t,
             focusBits: [...t.focusBits, ...newBits],
           };
-          if (googleUser) {
-            saveTodoToFirestore(googleUser.uid, updated);
-          }
+          
           return updated;
         }
         return t;
@@ -526,9 +475,7 @@ export default function App() {
           b.id === bitId ? { ...b, completed: !b.completed } : b
         );
         const updated = { ...t, focusBits: updatedBits };
-        if (googleUser) {
-          saveTodoToFirestore(googleUser.uid, updated);
-        }
+        
         return updated;
       })
     );
@@ -555,17 +502,13 @@ export default function App() {
       }),
     };
     setSymptomLogs((prev) => [newLog, ...prev]);
-    if (googleUser) {
-      saveSymptomToFirestore(googleUser.uid, newLog);
-    }
+    
     triggerToast('Logged somatic symptom entry');
   };
 
   const handleDeleteSymptomLog = (id: string) => {
     setSymptomLogs((prev) => prev.filter((l) => l.id !== id));
-    if (googleUser) {
-      deleteSymptomFromFirestore(googleUser.uid, id);
-    }
+    
   };
 
   const handleAddNote = (noteData: Omit<NoteItem, 'id' | 'timestamp' | 'date'>) => {
@@ -579,17 +522,13 @@ export default function App() {
       }),
     };
     setNotes((prev) => [newNote, ...prev]);
-    if (googleUser) {
-      saveNoteToFirestore(googleUser.uid, newNote);
-    }
+    
     triggerToast('Saved micro note');
   };
 
   const handleDeleteNote = (id: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== id));
-    if (googleUser) {
-      deleteNoteFromFirestore(googleUser.uid, id);
-    }
+    
   };
 
   const handleTogglePinNote = (id: string) => {
@@ -597,9 +536,7 @@ export default function App() {
       prev.map((n) => {
         if (n.id === id) {
           const updated = { ...n, pinned: !n.pinned };
-          if (googleUser) {
-            saveNoteToFirestore(googleUser.uid, updated);
-          }
+          
           return updated;
         }
         return n;
@@ -630,7 +567,7 @@ export default function App() {
   };
 
   // Tab Order definitions - Merge saved order with default list to ensure no newly added tabs are omitted
-  const defaultTabList: ActiveTab[] = ['somatic', 'todo', 'sprint', 'meditation', 'yoga', 'medical'];
+  const defaultTabList: ActiveTab[] = ['todo', 'sprint', 'meditation', 'yoga', 'medical'];
   const userSavedOrder = userProfile.tabOrder || defaultTabList;
   const missingTabs = defaultTabList.filter((tab) => !userSavedOrder.includes(tab));
   const customTabOrder = [...userSavedOrder, ...missingTabs];
@@ -641,7 +578,6 @@ export default function App() {
   };
 
   const tabDefs: Record<ActiveTab, { label: string; icon: React.ReactNode }> = {
-    somatic: { label: 'Somatic & Mindset', icon: <Heart className="w-4 h-4" /> },
     todo: { label: 'To-Do & Focus Bits', icon: <ListTodo className="w-4 h-4" /> },
     sprint: { label: 'Sprint Engine', icon: <Timer className="w-4 h-4" /> },
     meditation: { label: 'Meditation & Pacer', icon: <Wind className="w-4 h-4" /> },
@@ -656,6 +592,9 @@ export default function App() {
       <div className="max-w-4xl w-full min-w-0 space-y-5 sm:space-y-6">
         {/* Header */}
         <Header
+          isSnapshotLoaded={isSnapshotLoaded}
+          isAuthenticated={!!authUser}
+          onOpenLogin={() => setIsLoginOpen(true)}
           battery={battery}
           onRechargeBattery={handleRechargeBattery}
           onDrainBattery={handleDrainBattery}
@@ -698,12 +637,6 @@ export default function App() {
 
         {/* View Panels */}
         <main className="bg-white/80 dark:bg-slate-900/90 border border-pink-100 dark:border-slate-800 backdrop-blur-xl rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl shadow-pink-500/5 min-w-0 max-w-full overflow-hidden">
-          {activeTab === 'somatic' && (
-            <SomaticMindsetTab
-              onCompleteUnfreeze={() => setActiveTab('todo')}
-              logs={sessionLogs}
-            />
-          )}
 
           {activeTab === 'todo' && (
             <TodoFocusBitsTab
@@ -800,6 +733,10 @@ export default function App() {
           onTogglePin={handleTogglePinNote}
         />
 
+        <LoginModal
+          isOpen={isLoginOpen}
+          onClose={() => setIsLoginOpen(false)}
+        />
         <SettingsModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}
@@ -812,12 +749,11 @@ export default function App() {
           onDailyReset={handleDailyReset}
           onClearAllData={handleClearAllData}
           onResetLevelXP={handleResetLevelXP}
-          googleUser={googleUser}
+          authUser={authUser}
           onGoogleLogout={async () => {
-            await logoutGoogleWorkspace();
-            setGoogleUser(null);
+            await signOut(auth);
             handleClearAllData();
-            triggerToast('Signed out of Google Account');
+            triggerToast('Signed out & Local Data Cleared');
           }}
         />
       </div>
