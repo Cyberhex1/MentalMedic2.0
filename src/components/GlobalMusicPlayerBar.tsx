@@ -147,7 +147,7 @@ export const GlobalMusicPlayerBar: React.FC<GlobalMusicPlayerBarProps> = ({
           type="button"
           onClick={onOpenMixer}
           className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-pink-400 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-          title="Open Spotify & YouTube Music Playlist Studio"
+          title="Open Music Studio"
         >
           <Sliders className="w-3.5 h-3.5" />
           <span className="hidden md:inline">Music Studio</span>

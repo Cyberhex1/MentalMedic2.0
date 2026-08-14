@@ -584,8 +584,9 @@ export default function App() {
       ...prev,
       isPlayingMusic: false,
       activeSoundscape: null,
+      currentTrack: null,
     }));
-    triggerToast('All audio stopped');
+    triggerToast('Player closed');
   };
 
   // Tab Order definitions

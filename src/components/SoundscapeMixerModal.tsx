@@ -3,18 +3,15 @@ import {
   X,
   Volume2,
   Sliders,
-  Sparkles,
   Play,
   Pause,
   Plus,
   Trash2,
-  Disc,
   Music2,
   Headphones,
   Search,
   ListMusic,
   Waves,
-  ExternalLink,
 } from 'lucide-react';
 import { AudioType, UserProfile, TrackItem, MusicPlaylist } from '../types';
 import { audioSynth } from '../lib/audioSynth';
@@ -195,12 +192,9 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-black text-white tracking-tight">Focus Music & Sound Studio</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 border border-pink-500/30">
-                  Spotify & YT Music Style
-                </span>
               </div>
               <p className="text-xs text-slate-400">
-                Play zero-ad streams & neural soundscapes without popups or videos
+                Click any song to play instantly
               </p>
             </div>
           </div>
@@ -262,7 +256,7 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                     className="text-xs font-bold text-pink-400 hover:text-pink-300 flex items-center gap-1 bg-pink-500/10 hover:bg-pink-500/20 px-2 py-1 rounded-lg border border-pink-500/20 transition-all cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Add YouTube</span>
+                    <span>Add Playlist</span>
                   </button>
                 </div>
 
@@ -323,7 +317,7 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                 </div>
               </div>
 
-              {/* Right Main Area: Playlist Header & Tracklist (Spotify Style) */}
+              {/* Right Main Area: Playlist Header & Tracklist */}
               <div className="flex-1 flex flex-col overflow-y-auto bg-slate-950 p-4 md:p-6 space-y-4">
                 {/* Playlist Hero Banner */}
                 <div
@@ -395,14 +389,14 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                   </span>
                 </div>
 
-                {/* Tracklist Table (Spotify Style) */}
+                {/* Tracklist Table */}
                 <div className="bg-slate-900/40 rounded-2xl border border-slate-800/80 overflow-hidden">
                   {/* Table Header */}
                   <div className="grid grid-cols-12 px-4 py-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-800">
                     <div className="col-span-1 text-center">#</div>
-                    <div className="col-span-6">Title & Artist</div>
-                    <div className="col-span-3 text-right">Duration</div>
-                    <div className="col-span-2 text-center">Play</div>
+                    <div className="col-span-8 md:col-span-7">Title & Artist</div>
+                    <div className="hidden md:block md:col-span-2 text-right">Duration</div>
+                    <div className="col-span-3 md:col-span-2 text-center">Status</div>
                   </div>
 
                   {/* Table Rows */}
@@ -419,10 +413,17 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                         return (
                           <div
                             key={track.id}
-                            className={`grid grid-cols-12 items-center px-4 py-2.5 text-xs transition-colors group ${
+                            onClick={() => {
+                              if (isThisTrackPlaying) {
+                                onTogglePlayPause();
+                              } else {
+                                onPlayTrack(track, selectedPlaylist);
+                              }
+                            }}
+                            className={`grid grid-cols-12 items-center px-4 py-3 text-xs transition-all cursor-pointer group ${
                               isThisTrackPlaying
-                                ? 'bg-pink-500/10 text-pink-400'
-                                : 'hover:bg-slate-800/50 text-slate-300'
+                                ? 'bg-pink-500/15 text-pink-300 font-medium'
+                                : 'hover:bg-slate-800/70 text-slate-300'
                             }`}
                           >
                             {/* Track Number or Animated Wave */}
@@ -439,18 +440,11 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                             </div>
 
                             {/* Title & Artist */}
-                            <div className="col-span-6 min-w-0 pr-2">
+                            <div className="col-span-8 md:col-span-7 min-w-0 pr-2">
                               <h5
-                                className={`font-bold text-xs truncate cursor-pointer hover:underline ${
-                                  isThisTrackPlaying ? 'text-pink-400' : 'text-white'
+                                className={`font-bold text-xs truncate ${
+                                  isThisTrackPlaying ? 'text-pink-400' : 'text-white group-hover:text-pink-300'
                                 }`}
-                                onClick={() => {
-                                  if (isThisTrackPlaying) {
-                                    onTogglePlayPause();
-                                  } else {
-                                    onPlayTrack(track, selectedPlaylist);
-                                  }
-                                }}
                               >
                                 {track.title}
                               </h5>
@@ -458,15 +452,16 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                             </div>
 
                             {/* Duration */}
-                            <div className="col-span-3 text-right text-[11px] font-mono text-slate-400">
+                            <div className="hidden md:block md:col-span-2 text-right text-[11px] font-mono text-slate-400">
                               {track.duration || 'Stream'}
                             </div>
 
                             {/* Action Play/Pause & Remove */}
-                            <div className="col-span-2 flex items-center justify-center gap-1">
+                            <div className="col-span-3 md:col-span-2 flex items-center justify-center gap-1.5">
                               <button
                                 type="button"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   if (isThisTrackPlaying) {
                                     onTogglePlayPause();
                                   } else {
@@ -490,7 +485,10 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                               {selectedPlaylist.isCustom && (
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteTrack(track.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteTrack(track.id);
+                                  }}
                                   className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-rose-400 rounded-md transition-all cursor-pointer"
                                   title="Remove Track"
                                 >
@@ -514,7 +512,7 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                   Procedural Focus Noise & Synthesizers
                 </h4>
                 <p className="text-xs text-slate-400">
-                  Instant, continuous neural acoustic relief without external video links. Only 1 sound plays at a time.
+                  Instant, continuous neural acoustic relief. Only 1 sound plays at a time.
                 </p>
               </div>
 
@@ -590,7 +588,7 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                   <div className="flex items-start justify-between gap-3 mb-4">
                     <div className="flex items-center gap-3">
                       <div className="p-3 rounded-2xl bg-fuchsia-500/20 text-fuchsia-400 border border-fuchsia-500/30">
-                        <Sparkles className="w-5 h-5" />
+                        <Volume2 className="w-5 h-5" />
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-white">Hi Popping Rhythm</h4>
@@ -654,10 +652,10 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
                   </div>
                   <div>
                     <h4 className="text-sm font-bold text-white">
-                      {addSongToExistingId ? 'Add Song to Playlist' : 'Add YouTube Focus Playlist'}
+                      {addSongToExistingId ? 'Add Song to Playlist' : 'Add Focus Playlist'}
                     </h4>
                     <p className="text-[11px] text-slate-400">
-                      Converts YouTube links to audio tracks with no video display
+                      Converts links to audio tracks with no video display
                     </p>
                   </div>
                 </div>
@@ -741,31 +739,24 @@ export const SoundscapeMixerModal: React.FC<SoundscapeMixerModalProps> = ({
         )}
 
         {/* Modal Bottom Bar */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-900/60 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-slate-400">
-            <Sparkles className="w-4 h-4 text-pink-400" />
-            <span>Music continues playing smoothly when you close this studio modal.</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {(isPlayingMusic || activeSoundscape) && (
-              <button
-                type="button"
-                onClick={onStopAll}
-                className="px-4 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-bold text-xs border border-rose-500/30 transition-all cursor-pointer"
-              >
-                Stop All Audio
-              </button>
-            )}
-
+        <div className="p-4 border-t border-slate-800/80 bg-slate-900/60 flex items-center justify-end gap-2">
+          {(isPlayingMusic || activeSoundscape) && (
             <button
               type="button"
-              onClick={onClose}
-              className="px-5 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs shadow-md shadow-pink-500/20 transition-all cursor-pointer"
+              onClick={onStopAll}
+              className="px-4 py-2 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 font-bold text-xs border border-rose-500/30 transition-all cursor-pointer"
             >
-              Done
+              Stop All Audio
             </button>
-          </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-xs shadow-md shadow-pink-500/20 transition-all cursor-pointer"
+          >
+            Done
+          </button>
         </div>
       </div>
     </div>
