@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Maximize, Minimize, ListTodo, Timer, Activity, Sparkles, Wind } from 'lucide-react';
+import { Maximize, Minimize, ListTodo, Timer, Activity, Sparkles, Wind, Disc, Pause } from 'lucide-react';
 import { Header } from './components/Header';
 import { TodoFocusBitsTab } from './components/TodoFocusBitsTab';
 import { MicroSprintTimer } from './components/MicroSprintTimer';
@@ -18,7 +18,7 @@ import { CuteUiDecorator } from './components/CuteUiDecorator';
 import { GlobalMusicPlayerBar } from './components/GlobalMusicPlayerBar';
 import { SessionLog, TodoItem, SymptomLog, UserProfile, NoteItem, ActiveTab, TrackItem, MusicPlaylist, AudioType } from './types';
 import { audioSynth } from './lib/audioSynth';
-import { DEFAULT_PLAYLISTS } from './lib/musicData';
+import { DEFAULT_PLAYLISTS, extractYouTubeId } from './lib/musicData';
 import { User } from 'firebase/auth';
 import {
   auth,
@@ -183,6 +183,7 @@ export default function App() {
   const [isMixerOpen, setIsMixerOpen] = useState<boolean>(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isPlayerBarDismissed, setIsPlayerBarDismissed] = useState<boolean>(false);
 
   // Initialize Auth state listener
   useEffect(() => {
@@ -507,9 +508,10 @@ export default function App() {
     triggerToast('Account Level, Focus Bits & Streaks reset to Level 1!');
   };
 
-  // Single Audio Engine Handlers (Spotify & YT Music Style)
+  // Single Audio Engine Handlers
   const handlePlayTrack = (track: TrackItem, playlist?: MusicPlaylist) => {
     audioSynth.stopAllSoundscapes();
+    setIsPlayerBarDismissed(false);
     setUserProfile((prev) => ({
       ...prev,
       activeSoundscape: null,
@@ -520,6 +522,33 @@ export default function App() {
       audioSynth.playClickSound();
     }
     triggerToast(`Playing: ${track.title}`);
+  };
+
+  const getEmbedUrl = () => {
+    if (!userProfile.currentTrack) return '';
+    const ytId = userProfile.currentTrack.youtubeId || '';
+    const ytUrl = userProfile.currentTrack.youtubeUrl || '';
+
+    // Check if it's a playlist URL or list parameter
+    if (
+      ytId.includes('videoseries') ||
+      ytId.startsWith('PL') ||
+      ytId.startsWith('RD') ||
+      (ytUrl && ytUrl.includes('list='))
+    ) {
+      const { playlistId } = extractYouTubeId(ytUrl || ytId);
+      const list = playlistId || ytId.replace('videoseries?list=', '');
+      return `https://www.youtube-nocookie.com/embed/videoseries?list=${list}&autoplay=1&playsinline=1&controls=1&enablejsapi=1`;
+    }
+
+    const { videoId } = extractYouTubeId(ytUrl || ytId);
+    const cleanId =
+      videoId ||
+      ytId
+        .split('?')[0]
+        .replace('https://youtu.be/', '')
+        .replace('https://www.youtube.com/watch?v=', '');
+    return `https://www.youtube-nocookie.com/embed/${cleanId}?autoplay=1&playsinline=1&controls=1&enablejsapi=1`;
   };
 
   const handleTogglePlayPause = () => {
@@ -760,35 +789,84 @@ export default function App() {
           onStopAll={handleStopAllAudio}
         />
 
-        {/* Global Spotify & YouTube Music Style Mini Player Bar */}
-        <GlobalMusicPlayerBar
-          userProfile={userProfile}
-          onUpdateProfile={handleUpdateProfile}
-          onOpenMixer={() => setIsMixerOpen(true)}
-          onPlayTrack={handlePlayTrack}
-          onTogglePlayPause={handleTogglePlayPause}
-          onNextTrack={handleNextTrack}
-          onPrevTrack={handlePrevTrack}
-          onStopAll={handleStopAllAudio}
-        />
+        {/* Global Mini Player Bar */}
+        {!isPlayerBarDismissed && (
+          <GlobalMusicPlayerBar
+            userProfile={userProfile}
+            onUpdateProfile={handleUpdateProfile}
+            onOpenMixer={() => setIsMixerOpen(true)}
+            onPlayTrack={handlePlayTrack}
+            onTogglePlayPause={handleTogglePlayPause}
+            onNextTrack={handleNextTrack}
+            onPrevTrack={handlePrevTrack}
+            onDismissBar={() => setIsPlayerBarDismissed(true)}
+            onStopAll={handleStopAllAudio}
+            embedUrl={getEmbedUrl()}
+          />
+        )}
 
-        {/* Persistent Background YouTube Audio Engine (Zero video window, audio continues even when modal closes) */}
+        {/* Dismissed State Floating Pill (Audio Continues in Background) */}
+        {isPlayerBarDismissed && (userProfile.isPlayingMusic || userProfile.activeSoundscape) && (
+          <div className="fixed bottom-4 right-4 z-40 bg-slate-900/95 border border-pink-500/40 rounded-2xl p-2.5 shadow-2xl backdrop-blur-xl flex items-center gap-2.5 animate-slideUp text-white">
+            <div
+              className="w-8 h-8 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-white shrink-0 cursor-pointer shadow-md"
+              onClick={() => setIsPlayerBarDismissed(false)}
+              title="Show Player Bar"
+            >
+              {userProfile.isPlayingMusic || userProfile.activeSoundscape ? (
+                <div className="flex items-end gap-0.5 h-3.5">
+                  <span className="w-1 bg-white rounded-full animate-bounce h-2.5"></span>
+                  <span className="w-1 bg-white rounded-full animate-bounce h-3 delay-75"></span>
+                  <span className="w-1 bg-white rounded-full animate-bounce h-1.5 delay-150"></span>
+                </div>
+              ) : (
+                <Disc className="w-4 h-4 text-white" />
+              )}
+            </div>
+
+            <div className="max-w-[130px] min-w-0">
+              <p className="text-[11px] font-bold text-white truncate">
+                {userProfile.currentTrack?.title ||
+                  (userProfile.activeSoundscape === 'brown' ? 'Brown Noise' : 'Focus Soundscape')}
+              </p>
+              <p className="text-[9px] text-pink-400 font-medium truncate">
+                Playing in Background
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsPlayerBarDismissed(false)}
+              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-pink-300 text-[10px] font-bold cursor-pointer"
+            >
+              Show
+            </button>
+
+            <button
+              type="button"
+              onClick={handleTogglePlayPause}
+              className="p-1.5 rounded-lg bg-pink-500 hover:bg-pink-400 text-white shadow-sm cursor-pointer"
+              title="Pause"
+            >
+              <Pause className="w-3 h-3 fill-white" />
+            </button>
+          </div>
+        )}
+
+        {/* Persistent YouTube Audio Stream (Mounted in DOM with valid dimensions so browsers never mute or throttle) */}
         {userProfile.isPlayingMusic && userProfile.currentTrack && (
           <div
-            className="fixed -top-[9999px] -left-[9999px] w-1 h-1 opacity-0 pointer-events-none overflow-hidden"
+            className="fixed bottom-0 right-0 w-24 h-16 opacity-1 pointer-events-none overflow-hidden z-0 rounded-tl-xl"
+            style={{ clipPath: 'inset(100%)' }}
             aria-hidden="true"
           >
             <iframe
               key={userProfile.currentTrack.id + '_' + userProfile.currentTrack.youtubeId}
-              width="100"
-              height="100"
-              src={`https://www.youtube.com/embed/${
-                userProfile.currentTrack.youtubeId.includes('videoseries')
-                  ? userProfile.currentTrack.youtubeId
-                  : userProfile.currentTrack.youtubeId
-              }?autoplay=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
-              title="Background Audio Stream"
-              allow="autoplay; encrypted-media"
+              width="200"
+              height="200"
+              src={getEmbedUrl()}
+              title="Focus Audio Engine"
+              allow="autoplay; encrypted-media; picture-in-picture"
             />
           </div>
         )}

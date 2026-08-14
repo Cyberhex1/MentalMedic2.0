@@ -4,7 +4,7 @@ export const DEFAULT_PLAYLISTS: MusicPlaylist[] = [
   {
     id: 'pl_lofi',
     name: 'Lofi Study & Work Sanctuary',
-    description: 'Chill aesthetic beats, zero-stress vinyl rhythms, and soft melodies for ADHD & deep focus.',
+    description: 'Chill aesthetic beats, zero-stress vinyl rhythms, and soft melodies for deep focus.',
     coverGradient: 'from-pink-500 via-purple-500 to-indigo-500',
     icon: '☕',
     tracks: [
@@ -94,7 +94,7 @@ export const DEFAULT_PLAYLISTS: MusicPlaylist[] = [
         id: 't_amb_1',
         title: '40Hz Gamma Focus Frequency',
         artist: 'Cognitive Flow Labs',
-        duration: 'Audio Stream',
+        duration: 'Continuous Stream',
         youtubeId: 'WPni755-Krg',
         youtubeUrl: 'https://www.youtube.com/watch?v=WPni755-Krg',
       },
@@ -160,11 +160,11 @@ export function extractYouTubeId(urlOrId: string): { videoId?: string; playlistI
     return { videoId: clean };
   }
 
-  // Extract playlist ID if present
+  // Extract playlist ID if present in URL (?list=... or &list=...)
   const playlistMatch = clean.match(/[?&]list=([a-zA-Z0-9_-]+)/);
   const playlistId = playlistMatch ? playlistMatch[1] : undefined;
 
-  // Extract video ID
+  // Extract video ID if present
   const videoMatch = clean.match(/(?:youtu\.be\/|v=|\/v\/|\/embed\/|watch\?v=|\/shorts\/)([a-zA-Z0-9_-]{11})/);
   const videoId = videoMatch ? videoMatch[1] : undefined;
 
@@ -178,46 +178,38 @@ export function createCustomPlaylistFromUrl(
 ): MusicPlaylist {
   const { videoId, playlistId } = extractYouTubeId(urlOrId);
   const id = 'pl_' + Date.now();
-  const title = name.trim() || 'My YouTube Playlist';
+  const title = name.trim() || (playlistId ? 'Full YouTube Playlist' : 'YouTube Focus Music');
 
-  // If it's a playlist URL or a single video, format a playlist entry with generated tracks
   const tracks: TrackItem[] = [];
 
   if (playlistId) {
-    // Generate representative playlist tracks for UI selection
-    const baseTitle = customTrackTitle || title;
-    tracks.push(
-      {
-        id: 't_' + Date.now() + '_1',
-        title: `${baseTitle} (Full Playlist Queue)`,
-        artist: 'YouTube Playlist Stream',
-        duration: 'Queue',
-        youtubeId: `videoseries?list=${playlistId}`,
-        youtubeUrl: urlOrId,
-      },
-      {
-        id: 't_' + Date.now() + '_2',
-        title: `${baseTitle} - Flow Session 1`,
-        artist: 'Curated Track',
-        duration: '3:45',
-        youtubeId: videoId || `videoseries?list=${playlistId}`,
-        youtubeUrl: urlOrId,
-      },
-      {
-        id: 't_' + Date.now() + '_3',
-        title: `${baseTitle} - Flow Session 2`,
-        artist: 'Curated Track',
-        duration: '4:10',
-        youtubeId: videoId || `videoseries?list=${playlistId}`,
-        youtubeUrl: urlOrId,
-      }
-    );
-  } else {
+    // Add primary full playlist queue track
     tracks.push({
-      id: 't_' + Date.now() + '_1',
+      id: 't_' + Date.now() + '_queue',
+      title: customTrackTitle || `${title} (Full Playlist Queue)`,
+      artist: 'Continuous YouTube Playlist',
+      duration: 'Continuous Queue',
+      youtubeId: `videoseries?list=${playlistId}`,
+      youtubeUrl: urlOrId,
+    });
+
+    if (videoId) {
+      tracks.push({
+        id: 't_' + Date.now() + '_first',
+        title: `${title} - Starting Track`,
+        artist: 'YouTube Stream',
+        duration: 'Track 1',
+        youtubeId: `${videoId}?list=${playlistId}`,
+        youtubeUrl: urlOrId,
+      });
+    }
+  } else {
+    // Single video/stream track
+    tracks.push({
+      id: 't_' + Date.now() + '_single',
       title: customTrackTitle || title,
-      artist: 'YouTube Stream',
-      duration: '3:30',
+      artist: 'YouTube Audio Stream',
+      duration: 'Audio Stream',
       youtubeId: videoId || urlOrId,
       youtubeUrl: urlOrId,
     });
@@ -226,9 +218,13 @@ export function createCustomPlaylistFromUrl(
   return {
     id,
     name: title,
-    description: `Added by user from YouTube: ${urlOrId}`,
-    coverGradient: 'from-pink-500 via-rose-500 to-amber-500',
-    icon: '🎵',
+    description: playlistId
+      ? `Full continuous YouTube playlist (${playlistId})`
+      : `Custom YouTube audio stream: ${urlOrId}`,
+    coverGradient: playlistId
+      ? 'from-red-500 via-pink-500 to-purple-600'
+      : 'from-pink-500 via-rose-500 to-amber-500',
+    icon: playlistId ? '▶️' : '🎵',
     tracks,
     isCustom: true,
   };

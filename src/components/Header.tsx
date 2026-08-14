@@ -129,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
                 type="button"
                 onClick={onOpenMixer}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-white dark:bg-slate-700 hover:bg-pink-100 dark:hover:bg-pink-950 text-pink-700 dark:text-pink-300 border border-pink-300 dark:border-pink-800 transition-all cursor-pointer shadow-2xs"
-                title="Open Spotify & YouTube Music Playlist Studio"
+                title="Open Focus Music Studio"
               >
                 <Sliders className="w-3.5 h-3.5 text-pink-500" />
                 <span>Music Studio</span>
