@@ -17,12 +17,17 @@ import {
   Split,
   Copy,
   SlidersHorizontal,
+  Edit3,
+  Pencil,
+  X,
+  Save,
 } from 'lucide-react';
-import { TodoItem, FocusBit, EisenhowerCategory, Rule135Category } from '../types';
+import { TodoItem, FocusBit, EisenhowerCategory, Rule135Category, Priority } from '../types';
 
 interface TodoFocusBitsTabProps {
   todos: TodoItem[];
   onAddTodo: (todo: Omit<TodoItem, 'id' | 'createdAt' | 'focusBits'>) => void;
+  onUpdateTodo?: (id: string, updatedFields: Partial<TodoItem>) => void;
   onToggleTodo: (id: string) => void;
   onDeleteTodo: (id: string) => void;
   onShatterIntoFocusBits: (todoId: string, bitTitles: string[]) => void;
@@ -33,6 +38,7 @@ interface TodoFocusBitsTabProps {
 export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
   todos,
   onAddTodo,
+  onUpdateTodo,
   onToggleTodo,
   onDeleteTodo,
   onShatterIntoFocusBits,
@@ -51,6 +57,70 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
   const [isFrog, setIsFrog] = useState<boolean>(false);
   const [shatterModalTodo, setShatterModalTodo] = useState<TodoItem | null>(null);
   const [customBits, setCustomBits] = useState<string[]>(['', '', '']);
+
+  // Edit Task State
+  const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
+  const [editTitle, setEditTitle] = useState<string>('');
+  const [editProject, setEditProject] = useState<string>('');
+  const [editPriority, setEditPriority] = useState<Priority>('medium');
+  const [editEisenhower, setEditEisenhower] = useState<EisenhowerCategory>('urgent_important');
+  const [editRule135, setEditRule135] = useState<Rule135Category>('small');
+  const [editIsFrog, setEditIsFrog] = useState<boolean>(false);
+  const [editFocusBits, setEditFocusBits] = useState<FocusBit[]>([]);
+  const [newBitTitleInput, setNewBitTitleInput] = useState<string>('');
+
+  const handleOpenEdit = (todo: TodoItem) => {
+    setEditingTodo(todo);
+    setEditTitle(todo.title);
+    setEditProject(todo.project || '');
+    setEditPriority(todo.priority || 'medium');
+    setEditEisenhower(todo.eisenhower || 'urgent_important');
+    setEditRule135(todo.rule135 || 'small');
+    setEditIsFrog(!!todo.isFrog);
+    setEditFocusBits(todo.focusBits ? [...todo.focusBits] : []);
+    setNewBitTitleInput('');
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTodo || !editTitle.trim()) return;
+
+    if (onUpdateTodo) {
+      onUpdateTodo(editingTodo.id, {
+        title: editTitle.trim(),
+        project: editProject.trim() || undefined,
+        priority: editPriority,
+        eisenhower: editEisenhower,
+        rule135: editRule135,
+        isFrog: editIsFrog,
+        focusBits: editFocusBits,
+      });
+    }
+
+    setEditingTodo(null);
+  };
+
+  const handleAddBitToEdit = () => {
+    if (!newBitTitleInput.trim()) return;
+    const newBit: FocusBit = {
+      id: 'b_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
+      title: newBitTitleInput.trim(),
+      completed: false,
+      createdAt: Date.now(),
+    };
+    setEditFocusBits((prev) => [...prev, newBit]);
+    setNewBitTitleInput('');
+  };
+
+  const handleRemoveBitFromEdit = (bitId: string) => {
+    setEditFocusBits((prev) => prev.filter((b) => b.id !== bitId));
+  };
+
+  const handleUpdateBitTitleInEdit = (bitId: string, title: string) => {
+    setEditFocusBits((prev) =>
+      prev.map((b) => (b.id === bitId ? { ...b, title } : b))
+    );
+  };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,6 +148,7 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
       eisenhower: todo.eisenhower,
       rule135: todo.rule135,
       isFrog: todo.isFrog,
+      project: todo.project,
     });
   };
 
@@ -128,6 +199,7 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
                   ? 'bg-pink-500 border-pink-500 text-white'
                   : 'border-slate-300 hover:border-pink-500 text-transparent'
               }`}
+              title={todo.completed ? 'Mark uncompleted' : 'Mark completed'}
             >
               <Check className="w-3.5 h-3.5 stroke-[3]" />
             </button>
@@ -145,9 +217,11 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
                   </span>
                 )}
                 <h4
-                  className={`text-xs font-bold text-slate-800 truncate ${
+                  className={`text-xs font-bold text-slate-800 truncate cursor-pointer hover:text-pink-600 transition-colors ${
                     todo.completed ? 'line-through text-slate-400' : ''
                   }`}
+                  onClick={() => handleOpenEdit(todo)}
+                  title="Click to edit task"
                 >
                   {todo.title}
                 </h4>
@@ -157,9 +231,18 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
 
           {/* Actions */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {/* Edit Task Button */}
+            <button
+              onClick={() => handleOpenEdit(todo)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-pink-600 hover:bg-pink-50 transition-colors cursor-pointer"
+              title="Edit Task & Focus Bits"
+            >
+              <Edit3 className="w-3.5 h-3.5" />
+            </button>
+
             <button
               onClick={() => handleDuplicate(todo)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               title="Duplicate Task"
             >
               <Copy className="w-3.5 h-3.5" />
@@ -171,12 +254,13 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
               title="Shatter this big task into zero-dread Focus Bits"
             >
               <Split className="w-3 h-3 text-purple-600" />
-              <span className="hidden sm:inline">Shatter to Bits</span>
+              <span className="hidden sm:inline">Shatter</span>
             </button>
 
             <button
               onClick={() => onSendToSprint(todo.title)}
               className="px-2.5 py-1 rounded-xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-sm shadow-pink-500/20"
+              title="Send to Micro Sprint Timer"
             >
               <Zap className="w-3 h-3" />
               <span>Sprint</span>
@@ -185,6 +269,7 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
             <button
               onClick={() => onDeleteTodo(todo.id)}
               className="p-1 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+              title="Delete Task"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -439,15 +524,24 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
                         key={todo.id}
                         className="bg-white p-2.5 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2 shadow-2xs"
                       >
-                        <span className={`text-xs font-medium text-slate-800 truncate ${todo.completed ? 'line-through text-slate-400' : ''}`}>
+                        <span className={`text-xs font-medium text-slate-800 truncate cursor-pointer hover:text-pink-600 ${todo.completed ? 'line-through text-slate-400' : ''}`} onClick={() => handleOpenEdit(todo)}>
                           {todo.title}
                         </span>
-                        <button
-                          onClick={() => onSendToSprint(todo.title)}
-                          className="px-2 py-0.5 bg-pink-100 hover:bg-pink-200 text-pink-700 font-bold text-[10px] rounded-md shrink-0 cursor-pointer"
-                        >
-                          Sprint
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleOpenEdit(todo)}
+                            className="p-1 rounded-md text-slate-400 hover:text-pink-600 hover:bg-pink-50 transition-colors cursor-pointer"
+                            title="Edit Task"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => onSendToSprint(todo.title)}
+                            className="px-2 py-0.5 bg-pink-100 hover:bg-pink-200 text-pink-700 font-bold text-[10px] rounded-md shrink-0 cursor-pointer"
+                          >
+                            Sprint
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -498,15 +592,24 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
                         key={todo.id}
                         className="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between gap-2"
                       >
-                        <span className={`text-xs font-medium text-slate-800 truncate ${todo.completed ? 'line-through text-slate-400' : ''}`}>
+                        <span className={`text-xs font-medium text-slate-800 truncate cursor-pointer hover:text-pink-600 ${todo.completed ? 'line-through text-slate-400' : ''}`} onClick={() => handleOpenEdit(todo)}>
                           {todo.title}
                         </span>
-                        <button
-                          onClick={() => onSendToSprint(todo.title)}
-                          className="px-2 py-0.5 bg-pink-500 text-white font-bold text-[10px] rounded-md shrink-0 cursor-pointer"
-                        >
-                          Sprint
-                        </button>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={() => handleOpenEdit(todo)}
+                            className="p-1 rounded-md text-slate-400 hover:text-pink-600 hover:bg-pink-50 transition-colors cursor-pointer"
+                            title="Edit Task"
+                          >
+                            <Edit3 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => onSendToSprint(todo.title)}
+                            className="px-2 py-0.5 bg-pink-500 text-white font-bold text-[10px] rounded-md shrink-0 cursor-pointer"
+                          >
+                            Sprint
+                          </button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -598,6 +701,202 @@ export const TodoFocusBitsTab: React.FC<TodoFocusBitsTabProps> = ({
                 Confirm Focus Bits
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Task Modal */}
+      {editingTodo && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="bg-white border border-pink-200 rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-pink-50/40">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-pink-100 text-pink-600">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Edit Task & Focus Bits</h3>
+                  <p className="text-[11px] text-slate-400">Modify details, categories, and breakdown steps</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setEditingTodo(null)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form Content */}
+            <form onSubmit={handleSaveEdit} className="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+              {/* Task Title */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Task Title</label>
+                <input
+                  type="text"
+                  required
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Task title..."
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-800 font-semibold focus:outline-none focus:border-pink-500"
+                />
+              </div>
+
+              {/* Project & Priority */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Project (Optional)</label>
+                  <input
+                    type="text"
+                    value={editProject}
+                    onChange={(e) => setEditProject(e.target.value)}
+                    placeholder="e.g. Work, Admin..."
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-medium focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Priority</label>
+                  <select
+                    value={editPriority}
+                    onChange={(e) => setEditPriority(e.target.value as Priority)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-pink-500 cursor-pointer"
+                  >
+                    <option value="low">Low Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="high">High Priority</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Eisenhower Matrix Quadrant */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Eisenhower Matrix Quadrant</label>
+                <select
+                  value={editEisenhower}
+                  onChange={(e) => setEditEisenhower(e.target.value as EisenhowerCategory)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-pink-500 cursor-pointer"
+                >
+                  <option value="urgent_important">🔥 Do First (Urgent & Important)</option>
+                  <option value="not_urgent_important">📅 Schedule (Important, Not Urgent)</option>
+                  <option value="urgent_not_important">⚡ Delegate / Micro (Urgent, Low Impact)</option>
+                  <option value="not_urgent_not_important">☕ Somatic Low Bar (Low Priority)</option>
+                </select>
+              </div>
+
+              {/* 1-3-5 Rule Category & Frog */}
+              <div className="grid grid-cols-2 gap-3 items-center">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">1-3-5 Rule Category</label>
+                  <select
+                    value={editRule135}
+                    onChange={(e) => setEditRule135(e.target.value as Rule135Category)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-700 font-medium focus:outline-none focus:border-pink-500 cursor-pointer"
+                  >
+                    <option value="big">1 Big Thing</option>
+                    <option value="medium">3 Medium Tasks</option>
+                    <option value="small">5 Focus Bits</option>
+                  </select>
+                </div>
+
+                <div className="pt-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-amber-800 bg-amber-50 p-2.5 rounded-xl border border-amber-200 hover:bg-amber-100 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={editIsFrog}
+                      onChange={(e) => setEditIsFrog(e.target.checked)}
+                      className="accent-amber-500 cursor-pointer"
+                    />
+                    <span>🐸 Mark as "Frog"</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Focus Bits Manager */}
+              <div className="bg-pink-50/40 border border-pink-100 rounded-2xl p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                    <Sparkles className="w-3.5 h-3.5 text-pink-500" />
+                    <span>Focus Bits ({editFocusBits.length})</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">Micro-steps for this task</span>
+                </div>
+
+                {/* Existing Bits List */}
+                <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                  {editFocusBits.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic py-1">No Focus Bits added yet.</p>
+                  ) : (
+                    editFocusBits.map((bit, idx) => (
+                      <div key={bit.id} className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-mono font-bold text-pink-500 w-4 text-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <input
+                          type="text"
+                          value={bit.title}
+                          onChange={(e) => handleUpdateBitTitleInEdit(bit.id, e.target.value)}
+                          className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs text-slate-800 focus:outline-none focus:border-pink-500 font-medium"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBitFromEdit(bit.id)}
+                          className="p-1 rounded-md text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer shrink-0"
+                          title="Remove Focus Bit"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Add New Bit Input */}
+                <div className="flex items-center gap-1.5 pt-1">
+                  <input
+                    type="text"
+                    value={newBitTitleInput}
+                    onChange={(e) => setNewBitTitleInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddBitToEdit();
+                      }
+                    }}
+                    placeholder="Add a new micro Focus Bit..."
+                    className="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddBitToEdit}
+                    disabled={!newBitTitleInput.trim()}
+                    className="px-2.5 py-1.5 rounded-lg bg-pink-500 hover:bg-pink-600 disabled:opacity-40 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shrink-0 shadow-xs"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Bit</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingTodo(null)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl text-xs font-bold bg-pink-500 hover:bg-pink-600 text-white flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-pink-500/20"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

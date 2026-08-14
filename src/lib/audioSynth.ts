@@ -186,6 +186,13 @@ export class MultiTrackSynthesizer {
   }
 
   public playSoundscape(type: AudioType, volume: number = 0.5) {
+    // Single sound stream: stop all other soundscapes before starting the new one
+    [...this.activeSoundscapes.keys()].forEach((k) => {
+      if (k !== type) {
+        this.stopSoundscape(k as AudioType);
+      }
+    });
+
     if (this.activeSoundscapes.has(type)) {
       this.setSoundscapeVolume(type, volume);
       return;

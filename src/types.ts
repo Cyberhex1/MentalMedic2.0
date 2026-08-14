@@ -4,6 +4,25 @@ export type AudioType = 'brown' | 'pink' | 'white' | 'rain' | 'binaural' | 'dron
 
 export type OfficeAudioType = 'teams_ping' | 'email_ping' | 'walking' | 'chair' | 'hvac' | 'keyboard' | 'office_keyboard' | 'chatter' | 'pages' | 'page_flip' | 'printer';
 
+export interface TrackItem {
+  id: string;
+  title: string;
+  artist: string;
+  duration?: string;
+  youtubeId: string;
+  youtubeUrl?: string;
+}
+
+export interface MusicPlaylist {
+  id: string;
+  name: string;
+  description?: string;
+  coverGradient?: string;
+  icon?: string;
+  tracks: TrackItem[];
+  isCustom?: boolean;
+}
+
 export interface UserProfile {
   name: string;
   roleTitle?: string;
@@ -19,10 +38,15 @@ export interface UserProfile {
   cuteUiEffects?: boolean;
   tabOrder?: ActiveTab[];
   activeSoundscapes?: string[];
+  activeSoundscape?: AudioType | null;
   mixerVolumes?: Record<string, number>;
   officeVolumes?: Record<string, number>;
   activeOfficeAudio?: string[];
   youtubePlaylists?: { id: string; name: string; url: string }[];
+  musicPlaylists?: MusicPlaylist[];
+  currentTrack?: TrackItem | null;
+  isPlayingMusic?: boolean;
+  musicVolume?: number;
   currentYoutubeUrl?: string;
 }
 
@@ -73,6 +97,7 @@ export interface NoteItem {
 
 export interface SessionLog {
   id: string;
+  taskTitle?: string;
   date?: string;
   timestamp: number;
   durationMinutes?: number;

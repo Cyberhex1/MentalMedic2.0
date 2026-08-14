@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, ListTodo, Timer, Activity, Building2, Layers, Sparkles, Sliders, Wind } from 'lucide-react';
+import { Maximize, Minimize, ListTodo, Timer, Activity, Sparkles, Wind } from 'lucide-react';
 import { Header } from './components/Header';
 import { TodoFocusBitsTab } from './components/TodoFocusBitsTab';
 import { MicroSprintTimer } from './components/MicroSprintTimer';
@@ -11,20 +11,19 @@ import { SessionLogsModal } from './components/SessionLogsModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { NotesDrawer } from './components/NotesDrawer';
 import { SettingsModal } from './components/SettingsModal';
-import { LoginModal } from './components/LoginModal';
 import { SoundscapeMixerModal } from './components/SoundscapeMixerModal';
 import { AnalyticsModal } from './components/AnalyticsModal';
 import { TypingSoundEngine } from './components/TypingSoundEngine';
 import { CuteUiDecorator } from './components/CuteUiDecorator';
-import { SessionLog, TodoItem, SymptomLog, UserProfile, NoteItem, ActiveTab } from './types';
+import { GlobalMusicPlayerBar } from './components/GlobalMusicPlayerBar';
+import { SessionLog, TodoItem, SymptomLog, UserProfile, NoteItem, ActiveTab, TrackItem, MusicPlaylist, AudioType } from './types';
 import { audioSynth } from './lib/audioSynth';
+import { DEFAULT_PLAYLISTS } from './lib/musicData';
 import { User } from 'firebase/auth';
-import { Unsubscribe } from 'firebase/firestore';
 import {
   auth,
   saveAppSnapshot,
   subscribeAppSnapshot,
-  AppSnapshot
 } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 
@@ -41,7 +40,7 @@ const DEFAULT_PROFILE: UserProfile = {
   xp: 150,
   cuteSoundEffects: true,
   cuteUiEffects: true,
-  tabOrder: ['todo', 'medical', 'sprint'],
+  tabOrder: ['todo', 'sprint', 'meditation', 'yoga', 'medical'],
   activeSoundscapes: ['brown'],
   mixerVolumes: { brown: 0.5 },
 };
@@ -139,7 +138,7 @@ const get2amCycleKey = (d: Date = new Date()): string => {
 };
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('somatic');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('todo');
 
   const [battery, setBattery] = useState<number>(() => {
     const saved = localStorage.getItem('zawe_battery');
@@ -180,7 +179,7 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState<boolean>(false);
   const [isNotesOpen, setIsNotesOpen] = useState<boolean>(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [isLoginOpen, setIsLoginOpen] = useState<boolean>(false);
+  const [isZenMode, setIsZenMode] = useState<boolean>(false);
   const [isMixerOpen, setIsMixerOpen] = useState<boolean>(false);
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -281,9 +280,7 @@ export default function App() {
   const addXp = (amount: number = 25) => {
     setUserProfile((prev) => {
       const nextXp = (prev.xp || 0) + amount;
-      const updated = { ...prev, xp: nextXp };
-      
-      return updated;
+      return { ...prev, xp: nextXp };
     });
     if (userProfile.cuteSoundEffects !== false) {
       audioSynth.playChime();
@@ -292,146 +289,62 @@ export default function App() {
 
   const handleUpdateProfile = (updated: UserProfile) => {
     setUserProfile(updated);
-    
   };
 
   const handleManualSync = async () => {
     if (!authUser) {
-      triggerToast('Cloud sync requires logging in with an account');
+      triggerToast('Please sign in inside Settings to sync to cloud!');
       return;
     }
-    await saveAppSnapshot(authUser.uid, { userProfile, todos, symptomLogs, notes, sessionLogs, battery });
-    triggerToast('☁️ Manual Cloud Sync Complete!');
-  };
-
-  const handleDrainBattery = (amount: number) => {
-    setBattery((prev) => {
-      const next = Math.max(0, prev - amount);
-      if (next <= 25 && prev > 25) {
-        triggerToast('⚠️ Cognitive Battery Low! Mandatory 3-minute somatic rest recommended.');
-      }
-      
-      return next;
-    });
+    try {
+      await saveAppSnapshot(authUser.uid, {
+        userProfile,
+        todos,
+        symptomLogs,
+        notes,
+        sessionLogs,
+        battery
+      });
+      triggerToast('Cloud Snapshot saved successfully! ☁️');
+    } catch (err: any) {
+      console.warn('Manual sync failed:', err);
+      triggerToast('Sync failed: ' + (err.message || 'Error'));
+    }
   };
 
   const handleRechargeBattery = () => {
-    setBattery((prev) => {
-      const next = Math.min(100, prev + 25);
-      
-      return next;
-    });
-    triggerToast('🔋 Somatic Recharge applied (+25% Energy)!');
+    setBattery((prev) => Math.min(100, prev + 25));
+    triggerToast('Recharged +25% Energy!');
   };
 
-  const handleLogTask = () => {
-    addXp(25);
-    handleDrainBattery(8); // Automatically lower battery based on finished bits
-    setUserProfile((prev) => {
-      const next = {
-        ...prev,
-        totalBitsLogged: prev.totalBitsLogged + 1,
-      };
-      
-      return next;
-    });
-    triggerToast('✨ 1 Focus Bit Completed (+25 XP)! Cognitive battery auto-lowered.');
+  const handleDrainBattery = (amount: number) => {
+    setBattery((prev) => Math.max(0, prev - amount));
   };
 
-  // Daily Reset & Log Archiving Logic
-  const handleDailyReset = (isAutomatic: boolean = false) => {
-    const completedCount = todos.filter((t) => t.completed).length;
-    const dateStr = new Date().toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-
-    const currentCycle = get2amCycleKey();
-    localStorage.setItem('zawe_last_reset_cycle', currentCycle);
-
-    const archivedLog: SessionLog = {
-      id: Date.now().toString(),
-      date: dateStr,
-      timestamp: Date.now(),
-      tasksCompleted: completedCount,
-      sprintsCount: 1,
-      energyEnd: battery,
-      effortRating: battery > 60 ? 'low' : battery > 30 ? 'standard' : 'high',
-      notes: `${isAutomatic ? 'Automatic 2 AM' : 'Manual'} Daily Reset summary: Completed ${completedCount} tasks with ${battery}% remaining cognitive battery.`,
-    };
-
-    setSessionLogs((prev) => [archivedLog, ...prev]);
-    
-
-    setTodos((prev) => {
-      const updated = prev.map((t) => ({
-        ...t,
-        completed: false,
-        focusBits: t.focusBits.map((b) => ({ ...b, completed: false })),
-      }));
-      
-      return updated;
-    });
-    setBattery(100);
-
-    triggerToast(
-      isAutomatic
-        ? '🌅 2 AM Auto-Reset Complete! Archived summary log and restored 100% battery.'
-        : '🌅 Daily Reset Complete! Archived summary log and restored 100% battery.'
-    );
-  };
-
-  useEffect(() => {
-    const check2amReset = () => {
-      const lastResetCycle = localStorage.getItem('zawe_last_reset_cycle');
-      const currentCycle = get2amCycleKey();
-
-      if (!lastResetCycle) {
-        localStorage.setItem('zawe_last_reset_cycle', currentCycle);
-      } else if (lastResetCycle !== currentCycle) {
-        handleDailyReset(true);
-      }
-    };
-
-    check2amReset();
-    const interval = setInterval(check2amReset, 20000);
-    return () => clearInterval(interval);
-  }, [todos, battery]);
-
-  const handleClearAllData = () => {
-    localStorage.clear();
-    setBattery(100);
-    setUserProfile(DEFAULT_PROFILE);
-    setTodos(DEFAULT_TODOS);
-    setSymptomLogs(DEFAULT_SYMPTOMS);
-    setNotes(DEFAULT_NOTES);
-    setSessionLogs([]);
-    triggerToast('🧹 All stored application data cleared!');
-  };
-
-  const handleAddTodo = (newTodoData: Omit<TodoItem, 'id' | 'createdAt' | 'focusBits'>) => {
+  const handleAddTodo = (todo: Omit<TodoItem, 'id' | 'createdAt'>) => {
     const newTodo: TodoItem = {
-      ...newTodoData,
-      id: Date.now().toString(),
-      focusBits: [],
+      ...todo,
+      id: 't_' + Date.now(),
       createdAt: Date.now(),
     };
     setTodos((prev) => [newTodo, ...prev]);
-    
-    triggerToast('Added new task to Matrix');
+    triggerToast('New task registered!');
   };
 
   const handleToggleTodo = (id: string) => {
     setTodos((prev) =>
       prev.map((t) => {
         if (t.id === id) {
-          const isCompleting = !t.completed;
-          const updated = { ...t, completed: isCompleting };
-          if (isCompleting) addXp(50);
-          
-          return updated;
+          const nextCompleted = !t.completed;
+          if (nextCompleted) {
+            addXp(30);
+            setUserProfile((p) => ({
+              ...p,
+              totalBitsLogged: (p.totalBitsLogged || 0) + 1,
+            }));
+            triggerToast('+30 XP! Task Completed 🌸');
+          }
+          return { ...t, completed: nextCompleted };
         }
         return t;
       })
@@ -440,120 +353,148 @@ export default function App() {
 
   const handleDeleteTodo = (id: string) => {
     setTodos((prev) => prev.filter((t) => t.id !== id));
-    
+    triggerToast('Task removed.');
   };
 
-  const handleShatterIntoFocusBits = (todoId: string, bitTitles: string[]) => {
-    const newBits = bitTitles.map((title, idx) => ({
-      id: `bit-${Date.now()}-${idx}`,
-      title,
-      completed: false,
-      createdAt: Date.now(),
-    }));
+  const handleUpdateTodo = (id: string, updatedFields: Partial<TodoItem>) => {
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updatedFields } : t))
+    );
+    triggerToast('Task details updated ✨');
+  };
 
+  const handleShatterIntoFocusBits = (todoId: string, bits: string[]) => {
     setTodos((prev) =>
       prev.map((t) => {
         if (t.id === todoId) {
-          const updated = {
+          const newBits = bits.map((title, i) => ({
+            id: `b_${Date.now()}_${i}`,
+            title,
+            completed: false,
+            createdAt: Date.now() + i,
+          }));
+          return {
             ...t,
             focusBits: [...t.focusBits, ...newBits],
           };
-          
-          return updated;
         }
         return t;
       })
     );
-    triggerToast('Shattered task into zero-dread Focus Bits!');
+    triggerToast(`Shattered into ${bits.length} Micro Focus Bits! 🔨`);
   };
 
   const handleToggleFocusBit = (todoId: string, bitId: string) => {
     setTodos((prev) =>
       prev.map((t) => {
-        if (t.id !== todoId) return t;
-        const updatedBits = t.focusBits.map((b) =>
-          b.id === bitId ? { ...b, completed: !b.completed } : b
-        );
-        const updated = { ...t, focusBits: updatedBits };
-        
-        return updated;
+        if (t.id === todoId) {
+          const updatedBits = t.focusBits.map((b) => {
+            if (b.id === bitId) {
+              const next = !b.completed;
+              if (next) {
+                addXp(15);
+                setUserProfile((p) => ({
+                  ...p,
+                  totalBitsLogged: (p.totalBitsLogged || 0) + 1,
+                }));
+                triggerToast('+15 XP! 1 Focus Bit Completed 🌱');
+              }
+              return { ...b, completed: next };
+            }
+            return b;
+          });
+          return { ...t, focusBits: updatedBits };
+        }
+        return t;
       })
     );
-    handleLogTask();
   };
 
   const handleSendToSprint = (taskTitle: string) => {
     setActiveSprintTaskTitle(taskTitle);
     setActiveTab('sprint');
-    triggerToast(`Sent "${taskTitle}" to Sprint Timer!`);
+    triggerToast(`Sent "${taskTitle}" to Sprint Timer ⏱️`);
   };
 
-  const handleAddSymptomLog = (logData: Omit<SymptomLog, 'id' | 'timestamp' | 'date'>) => {
-    const newLog: SymptomLog = {
-      ...logData,
-      id: Date.now().toString(),
+  const handleLogTask = (title: string, durationSec: number = 300) => {
+    const newLog: SessionLog = {
+      id: 'log_' + Date.now(),
+      taskTitle: title,
+      date: new Date().toLocaleDateString(),
+      durationMinutes: Math.round(durationSec / 60),
       timestamp: Date.now(),
-      date: new Date().toLocaleDateString('en-US', {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
+      tasksCompleted: 1,
+      completedBits: 1,
+      energyEnd: battery,
+      effortRating: 'Calm Focus',
+      notes: `Completed sprint session: ${title}`,
+    };
+    setSessionLogs((prev) => [newLog, ...prev]);
+    addXp(40);
+    setUserProfile((p) => ({
+      ...p,
+      totalBitsLogged: (p.totalBitsLogged || 0) + 1,
+    }));
+    triggerToast(`Logged sprint session for "${title}" (+40 XP) 🎉`);
+  };
+
+  const handleAddSymptomLog = (log: Omit<SymptomLog, 'id' | 'timestamp'>) => {
+    const newLog: SymptomLog = {
+      ...log,
+      id: 'sym_' + Date.now(),
+      timestamp: Date.now(),
     };
     setSymptomLogs((prev) => [newLog, ...prev]);
-    
-    triggerToast('Logged somatic symptom entry');
+    addXp(10);
+    triggerToast('Health & symptom log saved gently 🩺');
   };
 
   const handleDeleteSymptomLog = (id: string) => {
-    setSymptomLogs((prev) => prev.filter((l) => l.id !== id));
-    
+    setSymptomLogs((prev) => prev.filter((s) => s.id !== id));
+    triggerToast('Log entry removed.');
   };
 
-  const handleAddNote = (noteData: Omit<NoteItem, 'id' | 'timestamp' | 'date'>) => {
+  const handleAddNote = (note: Omit<NoteItem, 'id' | 'timestamp'>) => {
     const newNote: NoteItem = {
-      ...noteData,
-      id: Date.now().toString(),
+      ...note,
+      id: 'note_' + Date.now(),
       timestamp: Date.now(),
-      date: new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      }),
     };
     setNotes((prev) => [newNote, ...prev]);
-    
-    triggerToast('Saved micro note');
+    triggerToast('Note saved! 📝');
   };
 
   const handleDeleteNote = (id: string) => {
     setNotes((prev) => prev.filter((n) => n.id !== id));
-    
+    triggerToast('Note deleted.');
   };
 
   const handleTogglePinNote = (id: string) => {
     setNotes((prev) =>
-      prev.map((n) => {
-        if (n.id === id) {
-          const updated = { ...n, pinned: !n.pinned };
-          
-          return updated;
-        }
-        return n;
-      })
+      prev.map((n) => (n.id === id ? { ...n, pinned: !n.pinned } : n))
     );
   };
 
-  const handleImportTaskToMicroBar = (taskTitle: string) => {
-    handleAddTodo({
-      title: taskTitle,
-      completed: false,
-      priority: 'medium',
-      eisenhower: 'not_urgent_important',
-      rule135: 'small',
-    });
-    triggerToast(`Imported "${taskTitle}" to To-Do Matrix!`);
-    setActiveTab('todo');
+  const handleDailyReset = () => {
+    setBattery(100);
+    setTodos((prev) => prev.filter((t) => !t.completed));
+    triggerToast('Daily Reset complete! Energy restored to 100% 🌿');
+  };
+
+  const handleClearAllData = () => {
+    localStorage.removeItem('zawe_battery');
+    localStorage.removeItem('zawe_profile');
+    localStorage.removeItem('zawe_todos');
+    localStorage.removeItem('zawe_symptoms');
+    localStorage.removeItem('zawe_notes');
+    localStorage.removeItem('zawe_session_logs');
+    setBattery(100);
+    setUserProfile(DEFAULT_PROFILE);
+    setTodos(DEFAULT_TODOS);
+    setSymptomLogs(DEFAULT_SYMPTOMS);
+    setNotes(DEFAULT_NOTES);
+    setSessionLogs([]);
+    triggerToast('All data cleared to fresh defaults.');
   };
 
   const handleResetLevelXP = () => {
@@ -563,10 +504,91 @@ export default function App() {
       totalBitsLogged: 0,
       streakDays: 0,
     });
-    triggerToast('Account Level, Focus Bits & Streaks reset to Level 1 (NEET)!');
+    triggerToast('Account Level, Focus Bits & Streaks reset to Level 1!');
   };
 
-  // Tab Order definitions - Merge saved order with default list to ensure no newly added tabs are omitted
+  // Single Audio Engine Handlers (Spotify & YT Music Style)
+  const handlePlayTrack = (track: TrackItem, playlist?: MusicPlaylist) => {
+    audioSynth.stopAllSoundscapes();
+    setUserProfile((prev) => ({
+      ...prev,
+      activeSoundscape: null,
+      currentTrack: track,
+      isPlayingMusic: true,
+    }));
+    if (userProfile.cuteSoundEffects !== false) {
+      audioSynth.playClickSound();
+    }
+    triggerToast(`Playing: ${track.title}`);
+  };
+
+  const handleTogglePlayPause = () => {
+    if (userProfile.activeSoundscape) {
+      const current = userProfile.activeSoundscape;
+      audioSynth.stopAllSoundscapes();
+      setUserProfile((prev) => ({ ...prev, activeSoundscape: null }));
+      triggerToast('Audio paused');
+    } else if (userProfile.currentTrack) {
+      const nextPlaying = !userProfile.isPlayingMusic;
+      setUserProfile((prev) => ({ ...prev, isPlayingMusic: nextPlaying }));
+      triggerToast(nextPlaying ? `Playing: ${userProfile.currentTrack.title}` : 'Music paused');
+    } else {
+      const first = DEFAULT_PLAYLISTS[0].tracks[0];
+      handlePlayTrack(first);
+    }
+  };
+
+  const handlePlaySoundscape = (type: AudioType) => {
+    if (userProfile.activeSoundscape === type) {
+      audioSynth.stopSoundscape(type);
+      setUserProfile((prev) => ({ ...prev, activeSoundscape: null }));
+      triggerToast('Soundscape stopped');
+    } else {
+      audioSynth.stopAllSoundscapes();
+      const vol = userProfile.musicVolume ?? 0.7;
+      audioSynth.playSoundscape(type, vol);
+      setUserProfile((prev) => ({
+        ...prev,
+        isPlayingMusic: false,
+        activeSoundscape: type,
+      }));
+      triggerToast(`Playing: ${type === 'brown' ? 'Brown Noise' : 'Hi Popping Synth'}`);
+    }
+  };
+
+  const handleNextTrack = () => {
+    const allPlaylists = [...DEFAULT_PLAYLISTS, ...(userProfile.musicPlaylists || [])];
+    const currentTrack = userProfile.currentTrack;
+    if (!currentTrack) return;
+
+    const playlist = allPlaylists.find((p) => p.tracks.some((t) => t.id === currentTrack.id)) || allPlaylists[0];
+    const currentIndex = playlist.tracks.findIndex((t) => t.id === currentTrack.id);
+    const nextIndex = (currentIndex + 1) % playlist.tracks.length;
+    handlePlayTrack(playlist.tracks[nextIndex], playlist);
+  };
+
+  const handlePrevTrack = () => {
+    const allPlaylists = [...DEFAULT_PLAYLISTS, ...(userProfile.musicPlaylists || [])];
+    const currentTrack = userProfile.currentTrack;
+    if (!currentTrack) return;
+
+    const playlist = allPlaylists.find((p) => p.tracks.some((t) => t.id === currentTrack.id)) || allPlaylists[0];
+    const currentIndex = playlist.tracks.findIndex((t) => t.id === currentTrack.id);
+    const prevIndex = (currentIndex - 1 + playlist.tracks.length) % playlist.tracks.length;
+    handlePlayTrack(playlist.tracks[prevIndex], playlist);
+  };
+
+  const handleStopAllAudio = () => {
+    audioSynth.stopAllSoundscapes();
+    setUserProfile((prev) => ({
+      ...prev,
+      isPlayingMusic: false,
+      activeSoundscape: null,
+    }));
+    triggerToast('All audio stopped');
+  };
+
+  // Tab Order definitions
   const defaultTabList: ActiveTab[] = ['todo', 'sprint', 'meditation', 'yoga', 'medical'];
   const userSavedOrder = userProfile.tabOrder || defaultTabList;
   const missingTabs = defaultTabList.filter((tab) => !userSavedOrder.includes(tab));
@@ -590,85 +612,103 @@ export default function App() {
       <TypingSoundEngine enabled={userProfile.typingSounds !== false} />
       <CuteUiDecorator enabled={userProfile.cuteUiEffects !== false} />
       <div className="max-w-4xl w-full min-w-0 space-y-5 sm:space-y-6">
-        {/* Header */}
-        <Header
-          isSnapshotLoaded={isSnapshotLoaded}
-          isAuthenticated={!!authUser}
-          onOpenLogin={() => setIsLoginOpen(true)}
-          battery={battery}
-          onRechargeBattery={handleRechargeBattery}
-          onDrainBattery={handleDrainBattery}
-          onSetBattery={(level) => setBattery(level)}
-          onTogglePanic={() => setIsPanicOpen(true)}
-          onOpenLogs={() => setIsLogsOpen(true)}
-          onOpenProfile={() => setIsProfileOpen(true)}
-          onOpenNotes={() => setIsNotesOpen(true)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenMixer={() => setIsMixerOpen(true)}
-          onDailyReset={handleDailyReset}
-          userProfile={userProfile}
-          onUpdateProfile={handleUpdateProfile}
-        />
+        
+        {!isZenMode && (
+          <>
+          {/* Header */}
+          <Header
+            battery={battery}
+            onRechargeBattery={handleRechargeBattery}
+            onDrainBattery={handleDrainBattery}
+            onSetBattery={(level) => setBattery(level)}
+            onTogglePanic={() => setIsPanicOpen(true)}
+            onOpenLogs={() => setIsLogsOpen(true)}
+            onOpenProfile={() => setIsProfileOpen(true)}
+            onOpenNotes={() => setIsNotesOpen(true)}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenMixer={() => setIsMixerOpen(true)}
+            onTogglePlayPause={handleTogglePlayPause}
+            onDailyReset={handleDailyReset}
+            userProfile={userProfile}
+            onUpdateProfile={handleUpdateProfile}
+          />
 
-        {/* Primary Tab Navigation Bar with Thin Scrollbar */}
-        <div className="relative group max-w-full min-w-0">
-          <nav className="flex gap-2 overflow-x-auto pb-2.5 tab-scrollbar max-w-full min-w-0">
-            {customTabOrder.map((tabKey) => {
-              const def = tabDefs[tabKey];
-              if (!def) return null;
+          {/* Primary Tab Navigation Bar with Thin Scrollbar */}
+          <div className="relative group max-w-full min-w-0">
+            <nav className="flex gap-2 overflow-x-auto pb-2.5 tab-scrollbar max-w-full min-w-0">
+              {customTabOrder.map((tabKey) => {
+                const def = tabDefs[tabKey];
+                if (!def) return null;
 
-              return (
-                <button
-                  key={tabKey}
-                  onClick={() => handleSelectTab(tabKey)}
-                  className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
-                    activeTab === tabKey
-                      ? 'bg-pink-500 text-white shadow-md shadow-pink-500/20'
-                      : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
-                >
-                  {def.icon}
-                  <span>{def.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+                return (
+                  <button
+                    key={tabKey}
+                    onClick={() => handleSelectTab(tabKey)}
+                    className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer shrink-0 ${
+                      activeTab === tabKey
+                        ? 'bg-pink-500 text-white shadow-md shadow-pink-500/20'
+                        : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border border-slate-200/80 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {def.icon}
+                    <span>{def.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+          </>
+        )}
 
         {/* View Panels */}
-        <main className="bg-white/80 dark:bg-slate-900/90 border border-pink-100 dark:border-slate-800 backdrop-blur-xl rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl shadow-pink-500/5 min-w-0 max-w-full overflow-hidden">
+        <main className={
+          isZenMode 
+            ? "fixed inset-0 z-50 bg-slate-50 dark:bg-slate-950 p-4 sm:p-8 md:p-16 overflow-y-auto flex flex-col"
+            : "bg-white/80 dark:bg-slate-900/90 border border-pink-100 dark:border-slate-800 backdrop-blur-xl rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl shadow-pink-500/5 min-w-0 max-w-full overflow-hidden relative"
+        }>
+          
+          <button
+            onClick={() => setIsZenMode(!isZenMode)}
+            className={`absolute top-4 right-4 p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer ${isZenMode ? 'fixed top-6 right-6 z-50 bg-white/50 backdrop-blur shadow-sm border border-slate-200' : ''}`}
+            title={isZenMode ? "Exit Zen Mode" : "Enter Zen Mode (Focus)"}
+          >
+            {isZenMode ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5 text-slate-300 hover:text-slate-600" />}
+          </button>
+          
+          <div className={isZenMode ? "max-w-4xl w-full mx-auto flex-1 mt-8" : ""}>
+            {activeTab === 'todo' && (
+              <TodoFocusBitsTab
+                todos={todos}
+                onAddTodo={handleAddTodo}
+                onUpdateTodo={handleUpdateTodo}
+                onToggleTodo={handleToggleTodo}
+                onDeleteTodo={handleDeleteTodo}
+                onShatterIntoFocusBits={handleShatterIntoFocusBits}
+                onToggleFocusBit={handleToggleFocusBit}
+                onSendToSprint={handleSendToSprint}
+              />
+            )}
 
-          {activeTab === 'todo' && (
-            <TodoFocusBitsTab
-              todos={todos}
-              onAddTodo={handleAddTodo}
-              onToggleTodo={handleToggleTodo}
-              onDeleteTodo={handleDeleteTodo}
-              onShatterIntoFocusBits={handleShatterIntoFocusBits}
-              onToggleFocusBit={handleToggleFocusBit}
-              onSendToSprint={handleSendToSprint}
-            />
-          )}
+            {activeTab === 'sprint' && (
+              <MicroSprintTimer
+                onLogTask={handleLogTask}
+                onDrainBattery={handleDrainBattery}
+                activeTaskTitle={activeSprintTaskTitle}
+              />
+            )}
 
-          {activeTab === 'sprint' && (
-            <MicroSprintTimer
-              onLogTask={handleLogTask}
-              onDrainBattery={handleDrainBattery}
-              activeTaskTitle={activeSprintTaskTitle}
-            />
-          )}
+            {activeTab === 'meditation' && <MeditationTab />}
 
-          {activeTab === 'meditation' && <MeditationTab />}
+            {activeTab === 'yoga' && <YogaTab />}
 
-          {activeTab === 'yoga' && <YogaTab />}
-
-          {activeTab === 'medical' && (
-            <MedicalSymptomsTab
-              symptomLogs={symptomLogs}
-              onAddLog={handleAddSymptomLog}
-              onDeleteLog={handleDeleteSymptomLog}
-            />
-          )}
+            {activeTab === 'medical' && (
+              <MedicalSymptomsTab
+                symptomLogs={symptomLogs}
+                onAddLog={handleAddSymptomLog}
+                onDeleteLog={handleDeleteSymptomLog}
+              />
+            )}
+          </div>
         </main>
 
         {/* Toast Alert */}
@@ -713,7 +753,44 @@ export default function App() {
           onClose={() => setIsMixerOpen(false)}
           userProfile={userProfile}
           onUpdateProfile={handleUpdateProfile}
+          onPlayTrack={handlePlayTrack}
+          onTogglePlayPause={handleTogglePlayPause}
+          onPlaySoundscape={handlePlaySoundscape}
+          onStopAll={handleStopAllAudio}
         />
+
+        {/* Global Spotify & YouTube Music Style Mini Player Bar */}
+        <GlobalMusicPlayerBar
+          userProfile={userProfile}
+          onUpdateProfile={handleUpdateProfile}
+          onOpenMixer={() => setIsMixerOpen(true)}
+          onPlayTrack={handlePlayTrack}
+          onTogglePlayPause={handleTogglePlayPause}
+          onNextTrack={handleNextTrack}
+          onPrevTrack={handlePrevTrack}
+          onStopAll={handleStopAllAudio}
+        />
+
+        {/* Persistent Background YouTube Audio Engine (Zero video window, audio continues even when modal closes) */}
+        {userProfile.isPlayingMusic && userProfile.currentTrack && (
+          <div
+            className="fixed -top-[9999px] -left-[9999px] w-1 h-1 opacity-0 pointer-events-none overflow-hidden"
+            aria-hidden="true"
+          >
+            <iframe
+              key={userProfile.currentTrack.id + '_' + userProfile.currentTrack.youtubeId}
+              width="100"
+              height="100"
+              src={`https://www.youtube.com/embed/${
+                userProfile.currentTrack.youtubeId.includes('videoseries')
+                  ? userProfile.currentTrack.youtubeId
+                  : userProfile.currentTrack.youtubeId
+              }?autoplay=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+              title="Background Audio Stream"
+              allow="autoplay; encrypted-media"
+            />
+          </div>
+        )}
 
         <AnalyticsModal
           isOpen={isAnalyticsOpen}
@@ -733,10 +810,6 @@ export default function App() {
           onTogglePin={handleTogglePinNote}
         />
 
-        <LoginModal
-          isOpen={isLoginOpen}
-          onClose={() => setIsLoginOpen(false)}
-        />
         <SettingsModal
           isOpen={isSettingsOpen}
           onClose={() => setIsSettingsOpen(false)}

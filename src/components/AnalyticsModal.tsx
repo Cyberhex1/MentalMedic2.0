@@ -105,9 +105,9 @@ export const AnalyticsModal: React.FC<AnalyticsModalProps> = ({
     {
       id: 'soundscape',
       icon: '🎧',
-      title: 'Soundscape Maestro',
-      desc: 'Layered multiple ambient tracks in the studio mixer.',
-      unlocked: (userProfile.activeSoundscapes && userProfile.activeSoundscapes.length >= 2) || (userProfile.totalBitsLogged || 0) >= 2,
+      title: 'Soundscape & Focus Maestro',
+      desc: 'Engaged with curated music playlists and focus soundscapes.',
+      unlocked: !!userProfile.currentTrack || !!userProfile.activeSoundscape || (userProfile.totalBitsLogged || 0) >= 2,
     },
     {
       id: 'self_compassion',
